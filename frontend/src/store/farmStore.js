@@ -57,10 +57,10 @@ export const useFarmStore = create(
 
       setSelectedCrops: (crops) => set({ selectedCrops: crops }),
 
-      confirmCropPlan: (crops) =>
+      confirmCropPlan: (crops, confirmedAt) =>
         set({
           selectedCrops: crops,
-          cropPlanConfirmedAt: new Date().toISOString(),
+          cropPlanConfirmedAt: confirmedAt || new Date().toISOString(),
           lastRecommendation: crops[0] || null,
         }),
 

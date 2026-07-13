@@ -1,4 +1,5 @@
 import { Link, useNavigate } from 'react-router-dom'
+import { useCallback } from 'react'
 import { motion } from 'framer-motion'
 import {
   Sprout,
@@ -14,23 +15,47 @@ import { Button } from '../components/ui/Button'
 import { Badge } from '../components/ui/Badge'
 import { SkeletonDashboard } from '../components/ui/Skeleton'
 import { EmptyState, ErrorState } from '../components/shared/EmptyState'
+import { LazyBackground } from '../components/shared/LazyBackground'
 import { useMockData } from '../hooks/useMockData'
 import { useAuthStore } from '../store/authStore'
 import { useFarmStore } from '../store/farmStore'
 import { formatDate, getGreeting, formatPercent, formatCurrency } from '../lib/utils'
 
+const loadDashboardTopBg = () => import('../assets/backgrounds/dashboard-top.webp')
+
+function DashboardHero({ name, children }) {
+  const loader = useCallback(() => loadDashboardTopBg(), [])
+  return (
+    <LazyBackground
+      loader={loader}
+      alt=""
+      className="rounded-xl mb-6 border border-border dark:border-border-dark min-h-[148px]"
+      imageClassName="object-cover object-top"
+      overlayClassName="bg-gradient-to-r from-black/70 via-black/45 to-black/25"
+    >
+      <div className="px-5 py-6 sm:px-6 sm:py-7">
+        <p className="ek-label mb-1 !text-white/60">{formatDate(new Date())}</p>
+        <h1 className="ek-headline text-2xl sm:text-3xl text-white drop-shadow-sm">
+          {getGreeting()}, {name}
+        </h1>
+        {children}
+      </div>
+    </LazyBackground>
+  )
+}
+
 export default function Dashboard() {
   const navigate = useNavigate()
   const user = useAuthStore((s) => s.user)
-  const hasSoilData = useFarmStore((s) => s.hasSoilData)
   const selectedCrops = useFarmStore((s) => s.selectedCrops)
   const cropPlanConfirmedAt = useFarmStore((s) => s.cropPlanConfirmedAt)
   const { loading, error, retry, topRecommendation, dashboardStats, hasSoilData: apiHasSoil } =
     useMockData()
 
   const name = user?.name || 'Farmer'
-  const primaryCrop = selectedCrops[0] || topRecommendation
-  const showEmpty = !hasSoilData && !apiHasSoil
+  const hasSoilData = apiHasSoil
+  const showEmpty = !loading && !error && !apiHasSoil
+  const primaryCrop = apiHasSoil ? selectedCrops[0] || topRecommendation : null
 
   if (loading) {
     return (
@@ -48,9 +73,14 @@ export default function Dashboard() {
     )
   }
 
-  if (showEmpty) {
+  if (showEmpty || !primaryCrop) {
     return (
       <PageWrapper>
+        <DashboardHero name={name}>
+          <p className="mt-2 text-sm text-white/75 max-w-md leading-relaxed">
+            Add a soil reading and we’ll build a crop plan for your land.
+          </p>
+        </DashboardHero>
         <EmptyState
           icon={Sprout}
           title="Start by telling us about your farm"
@@ -64,12 +94,11 @@ export default function Dashboard() {
 
   return (
     <PageWrapper>
-      <div className="mb-6">
-        <p className="ek-label mb-1">{formatDate(new Date())}</p>
-        <h1 className="ek-headline text-2xl text-text-primary dark:text-text-dark-primary">
-          {getGreeting()}, {name}
-        </h1>
-      </div>
+      <DashboardHero name={name}>
+        <p className="mt-2 text-sm text-white/75">
+          Here’s what looks strongest for your farm today.
+        </p>
+      </DashboardHero>
 
       <motion.div
         initial={{ opacity: 0, y: 10 }}
@@ -79,7 +108,7 @@ export default function Dashboard() {
         <Link to="/recommendations">
           <Card variant="featured" className="mb-6 group">
             <Badge variant="primary" size="sm" className="mb-3">
-              {cropPlanConfirmedAt ? 'Your crop plan' : "Today's priority"}
+              {cropPlanConfirmedAt ? 'Finalized plan' : hasSoilData ? 'Draft matches' : "Today's priority"}
             </Badge>
             <h2 className="ek-headline text-3xl text-text-primary dark:text-text-dark-primary mb-1">
               {primaryCrop.crop}

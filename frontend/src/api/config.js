@@ -3,8 +3,15 @@
  * Change providers, URLs, and feature flags here only.
  */
 export const apiConfig = {
-  /** When true, domain services return mock data instead of calling the backend */
-  useMock: import.meta.env.VITE_USE_MOCK_API !== 'false',
+  /** Opt-in only. Backend is the default source of truth. */
+  useMock: import.meta.env.VITE_USE_MOCK_API === 'true',
+
+  /** Reserved super-admin email (first register sets password) */
+  superAdminEmail: (
+    import.meta.env.VITE_SUPER_ADMIN_EMAIL || 'blsthathsara@gmail.com'
+  )
+    .trim()
+    .toLowerCase(),
 
   /** FarmSense FastAPI backend */
   backend: {
@@ -52,7 +59,17 @@ export const backendEndpoints = {
   },
   dashboard: '/dashboard',
   recommendations: '/recommendations',
+  confirmPlan: '/recommendations/confirm',
+  deletePlan: '/recommendations/plan',
   market: '/market',
   community: '/community',
   soil: '/soil',
+  admin: {
+    overview: '/admin/overview',
+    analytics: '/admin/analytics',
+    farmers: '/admin/farmers',
+    farmer: (id) => `/admin/farmers/${id}`,
+    modelsStatus: '/admin/models/status',
+    modelsTest: '/admin/models/test',
+  },
 }

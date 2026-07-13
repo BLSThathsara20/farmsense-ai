@@ -8,12 +8,13 @@ import {
   XAxis,
   YAxis,
 } from 'recharts'
-import { formatCurrency } from '../../lib/utils'
+import { formatCurrency, formatPriceIndex } from '../../lib/utils'
 import { useIsMobile } from '../../hooks/useMediaQuery'
 import { cn } from '../../lib/utils'
 
-function CustomTooltip({ active, payload, label }) {
+function CustomTooltip({ active, payload, label, unit }) {
   if (!active || !payload?.length) return null
+  const fmt = unit === 'index' ? formatPriceIndex : formatCurrency
 
   return (
     <div className="bg-surface dark:bg-surface-dark border border-border dark:border-border-dark rounded-md px-3 py-2 shadow-card text-xs sm:text-sm max-w-[200px]">
@@ -24,14 +25,15 @@ function CustomTooltip({ active, payload, label }) {
         .filter((entry) => entry.value != null)
         .map((entry) => (
           <p key={entry.dataKey} style={{ color: entry.color }} className="font-mono text-xs">
-            {entry.name}: {formatCurrency(entry.value)}
+            {entry.name}: {fmt(entry.value)}
+            {unit === 'index' ? ' idx' : ''}
           </p>
         ))}
     </div>
   )
 }
 
-export function PriceChart({ data = [], className }) {
+export function PriceChart({ data = [], className, unit = 'currency' }) {
   const isMobile = useIsMobile()
 
   if (!data.length) {
@@ -56,6 +58,8 @@ export function PriceChart({ data = [], className }) {
   const chartHeight = isMobile ? 208 : 256
   const yAxisWidth = isMobile ? 40 : 48
   const tickSize = isMobile ? 10 : 11
+  const fmtTick = (v) =>
+    unit === 'index' ? `${Math.round(v)}` : isMobile ? `${v}` : formatCurrency(v)
 
   return (
     <div
@@ -88,10 +92,10 @@ export function PriceChart({ data = [], className }) {
             tick={{ fontSize: tickSize, fill: 'var(--color-text-muted)' }}
             axisLine={false}
             tickLine={false}
-            tickFormatter={(v) => (isMobile ? `${v}` : `$${v}`)}
+            tickFormatter={fmtTick}
             domain={['auto', 'auto']}
           />
-          <Tooltip content={<CustomTooltip />} />
+          <Tooltip content={<CustomTooltip unit={unit} />} />
           <Area
             type="monotone"
             dataKey="upper"

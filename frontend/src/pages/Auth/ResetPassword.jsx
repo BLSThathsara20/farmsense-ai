@@ -32,8 +32,20 @@ export default function ResetPassword() {
   const {
     register,
     handleSubmit,
-    formState: { errors },
-  } = useForm({ resolver: zodResolver(schema) })
+    watch,
+    formState: { errors, isValid },
+  } = useForm({
+    resolver: zodResolver(schema),
+    mode: 'onChange',
+    reValidateMode: 'onChange',
+  })
+
+  const password = watch('password') || ''
+  const confirm = watch('confirm') || ''
+  const confirmMismatch = confirm.length > 0 && password !== confirm
+  const confirmMatch = confirm.length > 0 && password.length >= 6 && password === confirm
+  const confirmLiveError =
+    errors.confirm?.message || (confirmMismatch ? 'Passwords do not match' : undefined)
 
   const onSubmit = async (data) => {
     if (!token) {
@@ -98,10 +110,17 @@ export default function ResetPassword() {
                 label="Confirm password"
                 type="password"
                 icon={Lock}
-                error={errors.confirm?.message}
+                autoComplete="new-password"
+                error={confirmLiveError}
+                success={confirmMatch ? 'Passwords match' : undefined}
                 {...register('confirm')}
               />
-              <Button type="submit" loading={loading} className="w-full">
+              <Button
+                type="submit"
+                loading={loading}
+                className="w-full"
+                disabled={confirmMismatch || !isValid}
+              >
                 Update password
               </Button>
             </form>

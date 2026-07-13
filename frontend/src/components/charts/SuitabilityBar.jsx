@@ -5,7 +5,11 @@ export function SuitabilityBar({ score, label = 'Suitability' }) {
   return (
     <div className="w-full">
       <div className="flex justify-between items-center mb-2">
-        <span className="text-sm text-text-secondary dark:text-text-dark-secondary">{label}</span>
+        {label ? (
+          <span className="text-sm text-text-secondary dark:text-text-dark-secondary">{label}</span>
+        ) : (
+          <span />
+        )}
         <span className="font-mono text-sm font-medium text-text-primary dark:text-text-dark-primary">
           {score}%
         </span>
@@ -18,7 +22,7 @@ export function SuitabilityBar({ score, label = 'Suitability' }) {
           aria-valuenow={score}
           aria-valuemin={0}
           aria-valuemax={100}
-          aria-label={`${label}: ${score}%`}
+          aria-label={`${label || 'Score'}: ${score}%`}
         />
       </div>
     </div>

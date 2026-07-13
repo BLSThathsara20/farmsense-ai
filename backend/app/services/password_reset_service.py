@@ -22,9 +22,13 @@ def request_password_reset(db: Session, email: str) -> dict:
     cleaned = email.lower().strip()
 
     user = db.scalar(select(UserAccount).where(UserAccount.email == cleaned))
-    if not user or not user.is_active:
+    if not user:
         raise NotFoundError(
             "No account found with this email. Please register first, or check the address."
+        )
+    if not user.is_active:
+        raise UnauthorizedError(
+            "Your account has been deactivated. Please contact the FarmSense admin to reactivate it."
         )
 
     # Invalidate unused tokens for this user
@@ -57,7 +61,10 @@ def request_password_reset(db: Session, email: str) -> dict:
 
     if delivery.get("sent"):
         return {
-            "message": f"Password reset email sent to {user.email}. Check your inbox (and spam).",
+            "message": (
+                f"Password reset email sent to {user.email}. Check your inbox (and spam). "
+                "Older reset links stop working — use only the newest email."
+            ),
             "emailSent": True,
             "provider": delivery.get("provider"),
             "accountFound": True,
@@ -82,15 +89,26 @@ def request_password_reset(db: Session, email: str) -> dict:
 
 
 def reset_password(db: Session, token: str, new_password: str) -> dict:
-    if not token or len(token) < 20:
+    # Tokens may arrive URL-encoded from email clients
+    from urllib.parse import unquote
+
+    raw = unquote((token or "").strip())
+    if not raw or len(raw) < 20:
         raise UnauthorizedError("Invalid or expired reset link")
 
     row = db.scalar(
-        select(PasswordResetToken).where(PasswordResetToken.token_hash == _hash_token(token))
+        select(PasswordResetToken).where(PasswordResetToken.token_hash == _hash_token(raw))
     )
     now = datetime.now(UTC)
-    if not row or row.used_at is not None:
-        raise UnauthorizedError("Invalid or expired reset link")
+    if not row:
+        raise UnauthorizedError(
+            "Invalid reset link. Request a new one from Forgot password and open the latest email."
+        )
+    if row.used_at is not None:
+        raise UnauthorizedError(
+            "This reset link was already used or replaced by a newer one. "
+            "Request a fresh link and open the newest email only."
+        )
     expires = row.expires_at
     if expires.tzinfo is None:
         expires = expires.replace(tzinfo=UTC)
@@ -98,8 +116,12 @@ def reset_password(db: Session, token: str, new_password: str) -> dict:
         raise UnauthorizedError("This reset link has expired. Request a new one.")
 
     user = db.get(UserAccount, row.user_id)
-    if not user or not user.is_active:
+    if not user:
         raise UnauthorizedError("Invalid or expired reset link")
+    if not user.is_active:
+        raise UnauthorizedError(
+            "Your account has been deactivated. Please contact the FarmSense admin to reactivate it."
+        )
 
     user.password_hash = hash_password(new_password)
     row.used_at = now

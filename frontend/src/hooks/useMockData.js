@@ -7,7 +7,7 @@ import {
 } from '../api'
 import { useAsyncData } from './useAsyncData'
 
-/** @deprecated Use specific hooks below. Kept for backward compatibility. */
+/** Dashboard + farmer profile from GET /dashboard (live backend when mock is off). */
 export function useMockData() {
   const { data, loading, error, retry } = useAsyncData(
     () => dashboardService.getDashboard(),
@@ -31,7 +31,6 @@ export function useMockData() {
     regions: farmService.getRegions(),
     textureOptions: farmService.getTextureOptions(),
     cropPreferences: farmService.getCropPreferences(),
-    getPriceData: marketService.generatePriceData,
   }
 }
 
@@ -63,6 +62,10 @@ export function useRecommendations() {
     recommendations: data?.recommendations ?? [],
     topRecommendation: data?.topRecommendation,
     runDate: data?.runDate ?? new Date().toISOString(),
+    planStatus: data?.planStatus ?? null,
+    finalized: Boolean(data?.finalized),
+    selectedCropsFromServer: data?.selectedCrops ?? [],
+    finalizedAt: data?.finalizedAt ?? null,
   }
 }
 
@@ -80,8 +83,16 @@ export function useCommunityData() {
   }
 }
 
-import { crops } from '../api/mock/data'
-
+/** Crop names from GET /market/crops (DB reference data). */
 export function useCrops() {
-  return crops
+  const { data, loading, error, retry } = useAsyncData(
+    () => marketService.getCrops(),
+    []
+  )
+
+  const crops = Array.isArray(data)
+    ? data
+    : farmService.getCropPreferences().filter((c) => c !== 'No preference')
+
+  return { crops, loading, error, retry }
 }

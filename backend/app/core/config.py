@@ -21,10 +21,15 @@ class Settings(BaseSettings):
     jwt_algorithm: str = "HS256"
     jwt_expire_minutes: int = 480
 
+    # Reserved super-admin email — first register sets password; later visits use login
+    super_admin_email: str = "blsthathsara@gmail.com"
+
     cors_origins: str = "http://localhost:5173,http://127.0.0.1:5173"
 
     ml_artifacts_dir: Path | None = None
     ml_model_filename: str = "rf_suitability.pkl"
+    # Heavy mode: run L2/L3 LSTM (TensorFlow). Set ML_HEAVY=false for light fallback.
+    ml_heavy: bool = True
 
     cache_ttl_seconds: int = 60
     idempotency_ttl_hours: int = 24

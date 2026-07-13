@@ -10,8 +10,10 @@ import { Button } from '../../components/ui/Button'
 import { Card } from '../../components/ui/Card'
 import { Navbar } from '../../components/layout/Navbar'
 import { useAuthStore } from '../../store/authStore'
+import { useFarmStore } from '../../store/farmStore'
 import { authService, getErrorMessage } from '../../api'
 import { useToast } from '../../hooks/useToast'
+import { homePathForUser, isAdminUser } from '../../lib/roles'
 
 const schema = z.object({
   email: z.string().email('Please enter a valid email'),
@@ -36,9 +38,36 @@ export default function Login() {
     setFormError('')
     try {
       const { user, token } = await authService.login(data)
+      useFarmStore.getState().resetFarmData()
       login(user, token)
-      toast.success('Welcome back!', 'Good to see you again.')
-      navigate('/dashboard')
+
+      if (!isAdminUser(user)) {
+        // Prefill Plan with the farmer’s saved location (one farm = one place)
+        const savedLoc = user.location?.label
+          ? { ...user.location, source: user.location.source || 'saved' }
+          : user.region
+            ? {
+                id: `user-${user.id}`,
+                label: user.region,
+                fullLabel: user.district || user.region,
+                country: user.countryCode || 'GB',
+                source: 'saved',
+              }
+            : null
+        if (savedLoc?.label) {
+          const patch = { location: savedLoc, region: savedLoc.label }
+          if (user.farmSize && Number(user.farmSize) > 0) {
+            patch.area = Number(user.farmSize)
+          }
+          useFarmStore.getState().updateSoilData(patch)
+        }
+      }
+
+      toast.success(
+        isAdminUser(user) ? 'Welcome, admin' : 'Welcome back!',
+        isAdminUser(user) ? 'Opening the admin dashboard.' : 'Good to see you again.'
+      )
+      navigate(homePathForUser(user))
     } catch (err) {
       const message = getErrorMessage(err, 'Could not sign in. Please try again.')
       setFormError(message)
@@ -99,6 +128,11 @@ export default function Login() {
                 role="alert"
               >
                 <p className="text-error">{formError}</p>
+                {/deactivated|contact.+admin|reactivat/i.test(formError) && (
+                  <p className="mt-2 text-text-secondary dark:text-text-dark-secondary">
+                    Ask your FarmSense admin to reactivate your account, then try signing in again.
+                  </p>
+                )}
                 {/no account|register/i.test(formError) && (
                   <Link
                     to="/register"

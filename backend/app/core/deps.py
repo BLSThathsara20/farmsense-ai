@@ -7,10 +7,10 @@ from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
-from app.core.exceptions import ConflictError, UnauthorizedError
+from app.core.exceptions import ConflictError, ForbiddenError, UnauthorizedError
 from app.core.middleware import stable_request_hash
 from app.core.security import safe_decode_token
-from app.db.models import IdempotencyRecord, UserAccount
+from app.db.models import IdempotencyRecord, UserAccount, UserRole
 from app.db.session import get_db
 
 bearer_scheme = HTTPBearer(auto_error=False)
@@ -28,6 +28,14 @@ def get_current_user(
     user = db.get(UserAccount, uuid.UUID(payload["sub"]))
     if not user or not user.is_active:
         raise UnauthorizedError("User not found or inactive")
+    return user
+
+
+def require_admin(
+    user: Annotated[UserAccount, Depends(get_current_user)],
+) -> UserAccount:
+    if user.role != UserRole.admin:
+        raise ForbiddenError("Admin access required")
     return user
 
 

@@ -3,20 +3,50 @@ from sqlalchemy.orm import Session
 
 from app.db.models import FarmProfile, RecommendationRun, SoilReading, UserAccount
 from app.services.auth_service import user_to_json
-from app.services.soil_service import get_primary_farm, soil_reading_to_json
 
 
 def get_user_profile(db: Session, user: UserAccount) -> dict:
-    farm = get_primary_farm(db, user)
+    farm = db.scalar(select(FarmProfile).where(FarmProfile.user_id == user.id).limit(1))
 
-    soil_count = db.scalar(
-        select(func.count()).select_from(SoilReading).where(SoilReading.farm_profile_id == farm.id)
-    ) or 0
-    rec_count = db.scalar(
-        select(func.count())
-        .select_from(RecommendationRun)
-        .where(RecommendationRun.farm_profile_id == farm.id)
-    ) or 0
+    account = {
+        "id": str(user.id),
+        "email": user.email,
+        "createdAt": user.created_at.isoformat() if user.created_at else None,
+        "lastLoginAt": user.last_login_at.isoformat() if user.last_login_at else None,
+    }
+
+    if not farm:
+        return {
+            "user": user_to_json(user, None),
+            "account": account,
+            "farm": None,
+            "savedData": {
+                "soilReadingsCount": 0,
+                "recommendationRunsCount": 0,
+                "hasSoilData": False,
+                "hasRecommendations": False,
+                "lastSoilReading": None,
+                "lastRecommendation": None,
+                "recentSoilDates": [],
+            },
+        }
+
+    from app.services.soil_service import soil_reading_to_json
+
+    soil_count = (
+        db.scalar(
+            select(func.count()).select_from(SoilReading).where(SoilReading.farm_profile_id == farm.id)
+        )
+        or 0
+    )
+    rec_count = (
+        db.scalar(
+            select(func.count())
+            .select_from(RecommendationRun)
+            .where(RecommendationRun.farm_profile_id == farm.id)
+        )
+        or 0
+    )
 
     latest_soil = db.scalar(
         select(SoilReading)
@@ -40,18 +70,22 @@ def get_user_profile(db: Session, user: UserAccount) -> dict:
 
     return {
         "user": user_to_json(user, farm),
-        "account": {
-            "id": str(user.id),
-            "email": user.email,
-            "createdAt": user.created_at.isoformat() if user.created_at else None,
-            "lastLoginAt": user.last_login_at.isoformat() if user.last_login_at else None,
-        },
+        "account": account,
         "farm": {
             "id": str(farm.id),
             "district": farm.district_name,
             "region": farm.region_label,
             "areaHectares": float(farm.area_hectares) if farm.area_hectares else None,
             "countryCode": farm.country_code,
+            "location": {
+                "id": f"farm-{farm.id}",
+                "label": farm.region_label,
+                "fullLabel": farm.district_name or farm.region_label,
+                "country": (farm.country_code or "GB").upper(),
+                "source": "saved",
+            }
+            if farm.region_label
+            else None,
         },
         "savedData": {
             "soilReadingsCount": soil_count,
@@ -67,6 +101,12 @@ def get_user_profile(db: Session, user: UserAccount) -> dict:
                 "profitEstimate": float(latest_run.top_profit_estimate)
                 if latest_run.top_profit_estimate
                 else None,
+                "planStatus": (latest_run.ranked_output or {}).get("planStatus")
+                or ("finalized" if latest_run.status.value == "completed" else "draft"),
+                "finalized": bool((latest_run.ranked_output or {}).get("finalized"))
+                or latest_run.status.value == "completed",
+                "finalizedAt": (latest_run.ranked_output or {}).get("finalizedAt"),
+                "selectedCrops": (latest_run.ranked_output or {}).get("selectedCrops") or [],
             }
             if latest_run
             else None,

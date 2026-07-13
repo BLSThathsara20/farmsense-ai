@@ -46,6 +46,7 @@ export default function Settings() {
   }, [updateProfile])
 
   const handleSignOut = () => {
+    useFarmStore.getState().resetFarmData()
     logout()
     toast.info('Signed out', 'See you next time.')
     navigate('/login')

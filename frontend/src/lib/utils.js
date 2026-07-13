@@ -2,12 +2,18 @@ export function cn(...classes) {
   return classes.filter(Boolean).join(' ')
 }
 
-export function formatCurrency(value, currency = 'USD') {
-  return new Intl.NumberFormat('en-US', {
+export function formatCurrency(value, currency = 'GBP') {
+  return new Intl.NumberFormat('en-GB', {
     style: 'currency',
     currency,
     maximumFractionDigits: 0,
   }).format(value)
+}
+
+/** Agricultural price index (GOV.UK) — not a currency amount. */
+export function formatPriceIndex(value, decimals = 1) {
+  if (value == null || Number.isNaN(Number(value))) return '—'
+  return `${Number(value).toFixed(decimals)}` 
 }
 
 export function formatDate(date, options = {}) {

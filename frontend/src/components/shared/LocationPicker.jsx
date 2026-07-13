@@ -107,10 +107,25 @@ export function LocationPicker({ value, onChange, error }) {
     }
   }
 
+  useEffect(() => {
+    if (value?.label) {
+      setMode('selected')
+    }
+  }, [value?.label, value?.id])
+
   const clearSelection = () => {
     onChange(null)
     setMode('choose')
   }
+
+  const sourceLabel =
+    value?.source === 'gps'
+      ? 'GPS'
+      : value?.source === 'saved'
+        ? 'Your saved farm'
+        : value?.source === 'postcode'
+          ? 'Postcode'
+          : value?.source || 'selected'
 
   if (mode === 'selected' && value) {
     return (
@@ -128,6 +143,9 @@ export function LocationPicker({ value, onChange, error }) {
             <MapPin className="h-5 w-5 text-primary" />
           </div>
           <div className="flex-1 min-w-0">
+            {value.source === 'saved' && (
+              <p className="text-[11px] font-medium text-primary mb-0.5">Saved farm location</p>
+            )}
             <p className="font-medium text-sm text-text-primary dark:text-text-dark-primary">
               {value.label}
             </p>
@@ -137,7 +155,7 @@ export function LocationPicker({ value, onChange, error }) {
               </p>
             )}
             <p className="text-xs text-text-muted dark:text-text-dark-muted mt-1 capitalize">
-              via {value.source === 'gps' ? 'GPS' : value.source}
+              {sourceLabel}
             </p>
           </div>
           <Check className="h-5 w-5 text-success shrink-0" aria-hidden="true" />
@@ -147,7 +165,7 @@ export function LocationPicker({ value, onChange, error }) {
           onClick={clearSelection}
           className="mt-2 text-sm text-primary hover:underline min-h-[48px]"
         >
-          Change location
+          Use a different location
         </button>
         {error && (
           <p className="mt-1.5 text-sm text-error" role="alert">

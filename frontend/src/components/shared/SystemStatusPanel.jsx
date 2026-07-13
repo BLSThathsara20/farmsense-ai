@@ -47,7 +47,11 @@ export function SystemStatusPanel({ className }) {
   const apiOk = status?.api?.status === 'healthy'
   const dbOk = status?.ready?.database === true
   const mlOk = status?.ready?.ml_model === true
+  const layers = status?.ready?.layers || {}
   const liveApi = !status?.mockMode
+  const heavy = layers.heavy === true
+  const l2Ok = layers.l2_weather === true
+  const l3Ok = layers.l3_price === true
 
   return (
     <Card variant="bordered" className={cn('mb-4', className)}>
@@ -80,7 +84,17 @@ export function SystemStatusPanel({ className }) {
           />
           <StatusRow label="API /health" ok={apiOk} />
           <StatusRow label="PostgreSQL" ok={dbOk} />
-          <StatusRow label="ML model (RF)" ok={mlOk} />
+          <StatusRow label="L1 soil (RF)" ok={mlOk} />
+          <StatusRow
+            label="L2 weather (LSTM)"
+            ok={heavy ? l2Ok : false}
+            detail={heavy ? (l2Ok ? 'lstm_weather.h5' : 'loading / missing') : 'light mode'}
+          />
+          <StatusRow
+            label="L3 price (LSTM)"
+            ok={heavy ? l3Ok : false}
+            detail={heavy ? (l3Ok ? 'lstm_price.h5' : 'loading / missing') : 'light mode'}
+          />
           <div className="mt-3 pt-3 border-t border-border dark:border-border-dark">
             <p className="text-[11px] text-text-muted dark:text-text-dark-muted flex items-center gap-1.5">
               <Server className="h-3 w-3" />

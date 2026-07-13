@@ -34,15 +34,42 @@ export const recommendations = [
   {
     id: 1,
     crop: 'Tomato',
-    confidence: 92,
+    confidence: 88,
     profitEstimate: 4200,
     soilMatch: 94,
     weatherFit: 88,
     priceTrend: 76,
     demandSignal: 85,
+    factors: [
+      {
+        key: 'soil',
+        title: 'Soil status',
+        score: 94,
+        detail: 'Checked N, P, K, pH and texture against what this crop needs.',
+      },
+      {
+        key: 'weather',
+        title: 'Weather forecast',
+        score: 88,
+        detail: 'Current and near-future growing conditions for your area.',
+      },
+      {
+        key: 'price',
+        title: 'Future price',
+        score: 76,
+        detail: 'Expected market price around harvest / sell time.',
+      },
+      {
+        key: 'demand',
+        title: 'Market demand',
+        score: 85,
+        detail: 'Local demand and risk that too many farms plant the same crop.',
+      },
+    ],
     plantingWindow: { sow: 'Week 3–4', harvest: 'Week 14–16', sell: 'Week 8–10' },
     oversupplyRisk: 0.15,
-    reasoning: 'Your soil pH and NPK levels are ideal for tomato cultivation in your region.',
+    reasoning:
+      'We ranked Tomato using soil status, weather forecast, future price, and market demand — overall confidence 88%.',
     rank: 1,
   },
   {
@@ -54,9 +81,36 @@ export const recommendations = [
     weatherFit: 82,
     priceTrend: 91,
     demandSignal: 78,
+    factors: [
+      {
+        key: 'soil',
+        title: 'Soil status',
+        score: 86,
+        detail: 'Checked N, P, K, pH and texture against what this crop needs.',
+      },
+      {
+        key: 'weather',
+        title: 'Weather forecast',
+        score: 82,
+        detail: 'Current and near-future growing conditions for your area.',
+      },
+      {
+        key: 'price',
+        title: 'Future price',
+        score: 91,
+        detail: 'Expected market price around harvest / sell time.',
+      },
+      {
+        key: 'demand',
+        title: 'Market demand',
+        score: 78,
+        detail: 'Local demand and risk that too many farms plant the same crop.',
+      },
+    ],
     plantingWindow: { sow: 'Week 2–3', harvest: 'Week 12–14', sell: 'Week 10–12' },
     oversupplyRisk: 0.22,
-    reasoning: 'Strong market demand with good soil compatibility.',
+    reasoning:
+      'We ranked Chili using soil status, weather forecast, future price, and market demand — overall confidence 84%.',
     rank: 2,
   },
   {
@@ -68,9 +122,36 @@ export const recommendations = [
     weatherFit: 75,
     priceTrend: 68,
     demandSignal: 72,
+    factors: [
+      {
+        key: 'soil',
+        title: 'Soil status',
+        score: 80,
+        detail: 'Checked N, P, K, pH and texture against what this crop needs.',
+      },
+      {
+        key: 'weather',
+        title: 'Weather forecast',
+        score: 75,
+        detail: 'Current and near-future growing conditions for your area.',
+      },
+      {
+        key: 'price',
+        title: 'Future price',
+        score: 68,
+        detail: 'Expected market price around harvest / sell time.',
+      },
+      {
+        key: 'demand',
+        title: 'Market demand',
+        score: 72,
+        detail: 'Local demand and risk that too many farms plant the same crop.',
+      },
+    ],
     plantingWindow: { sow: 'Week 4–5', harvest: 'Week 16–18', sell: 'Week 14–16' },
     oversupplyRisk: 0.45,
-    reasoning: 'Moderate suitability — consider market timing carefully.',
+    reasoning:
+      'We ranked Onion using soil status, weather forecast, future price, and market demand — overall confidence 78%.',
     rank: 3,
   },
   {
@@ -82,9 +163,36 @@ export const recommendations = [
     weatherFit: 70,
     priceTrend: 65,
     demandSignal: 68,
+    factors: [
+      {
+        key: 'soil',
+        title: 'Soil status',
+        score: 74,
+        detail: 'Checked N, P, K, pH and texture against what this crop needs.',
+      },
+      {
+        key: 'weather',
+        title: 'Weather forecast',
+        score: 70,
+        detail: 'Current and near-future growing conditions for your area.',
+      },
+      {
+        key: 'price',
+        title: 'Future price',
+        score: 65,
+        detail: 'Expected market price around harvest / sell time.',
+      },
+      {
+        key: 'demand',
+        title: 'Market demand',
+        score: 68,
+        detail: 'Local demand and risk that too many farms plant the same crop.',
+      },
+    ],
     plantingWindow: { sow: 'Week 5–6', harvest: 'Week 15–17', sell: 'Week 13–15' },
     oversupplyRisk: 0.35,
-    reasoning: 'Loamy soil texture supports root crop development.',
+    reasoning:
+      'We ranked Carrot using soil status, weather forecast, future price, and market demand — overall confidence 71%.',
     rank: 4,
   },
   {
@@ -96,9 +204,36 @@ export const recommendations = [
     weatherFit: 72,
     priceTrend: 58,
     demandSignal: 60,
+    factors: [
+      {
+        key: 'soil',
+        title: 'Soil status',
+        score: 68,
+        detail: 'Checked N, P, K, pH and texture against what this crop needs.',
+      },
+      {
+        key: 'weather',
+        title: 'Weather forecast',
+        score: 72,
+        detail: 'Current and near-future growing conditions for your area.',
+      },
+      {
+        key: 'price',
+        title: 'Future price',
+        score: 58,
+        detail: 'Expected market price around harvest / sell time.',
+      },
+      {
+        key: 'demand',
+        title: 'Market demand',
+        score: 60,
+        detail: 'Local demand and risk that too many farms plant the same crop.',
+      },
+    ],
     plantingWindow: { sow: 'Week 3–4', harvest: 'Week 12–14', sell: 'Week 10–12' },
     oversupplyRisk: 0.72,
-    reasoning: 'High oversupply risk in your district this season.',
+    reasoning:
+      'We ranked Cabbage using soil status, weather forecast, future price, and market demand — overall confidence 65%.',
     rank: 5,
   },
 ]
@@ -211,33 +346,9 @@ export const soilReadings = {
   lastUpdated: '2026-06-28T08:30:00Z',
 }
 
-export const regions = [
-  { value: 'lk-central', label: 'Central Province, Sri Lanka', flag: '🇱🇰' },
-  { value: 'ke-nairobi', label: 'Nairobi County, Kenya', flag: '🇰🇪' },
-  { value: 'in-punjab', label: 'Punjab, India', flag: '🇮🇳' },
-  { value: 'ng-lagos', label: 'Lagos State, Nigeria', flag: '🇳🇬' },
-  { value: 'ph-mindanao', label: 'Mindanao, Philippines', flag: '🇵🇭' },
-  { value: 'vn-mekong', label: 'Mekong Delta, Vietnam', flag: '🇻🇳' },
-]
+import { regions, textureOptions, cropPreferences } from '../../constants/farmOptions'
 
-export const textureOptions = [
-  { value: 'Sandy', label: 'Sandy', description: 'Drains quickly, low nutrients' },
-  { value: 'Loamy', label: 'Loamy', description: 'Balanced — ideal for most crops' },
-  { value: 'Clay', label: 'Clay', description: 'Holds water, rich in nutrients' },
-  { value: 'Silty', label: 'Silty', description: 'Fine particles, good fertility' },
-]
-
-export const cropPreferences = [
-  'Tomato',
-  'Chili',
-  'Onion',
-  'Carrot',
-  'Cabbage',
-  'Potato',
-  'Maize',
-  'Beans',
-  'No preference',
-]
+export { regions, textureOptions, cropPreferences }
 
 export const dashboardStats = {
   topCropScore: 92,

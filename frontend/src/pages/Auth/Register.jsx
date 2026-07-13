@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useMemo, useState } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
 import { useForm } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
@@ -12,14 +12,22 @@ import { Slider } from '../../components/ui/Slider'
 import { Navbar } from '../../components/layout/Navbar'
 import { LocationPicker } from '../../components/shared/LocationPicker'
 import { useAuthStore } from '../../store/authStore'
+import { useFarmStore } from '../../store/farmStore'
 import { authService, getErrorMessage } from '../../api'
 import { useToast } from '../../hooks/useToast'
+import { homePathForUser, isSuperAdminEmail } from '../../lib/roles'
 
-const step1Schema = z.object({
-  name: z.string().min(2, 'Please enter your name'),
-  email: z.string().email('Please enter a valid email'),
-  password: z.string().min(6, 'Password must be at least 6 characters'),
-})
+const step1Schema = z
+  .object({
+    name: z.string().min(2, 'Please enter your name'),
+    email: z.string().email('Please enter a valid email'),
+    password: z.string().min(6, 'Password must be at least 6 characters'),
+    confirmPassword: z.string().min(6, 'Confirm your password'),
+  })
+  .refine((data) => data.password === data.confirmPassword, {
+    message: 'Passwords do not match',
+    path: ['confirmPassword'],
+  })
 
 const step2Schema = z.object({
   farmSize: z.number().min(0.5).max(100),
@@ -35,14 +43,76 @@ export default function Register() {
   const [location, setLocation] = useState(null)
   const [locationError, setLocationError] = useState('')
 
-  const step1Form = useForm({ resolver: zodResolver(step1Schema) })
+  const step1Form = useForm({
+    resolver: zodResolver(step1Schema),
+    mode: 'onChange',
+    reValidateMode: 'onChange',
+  })
   const step2Form = useForm({
     resolver: zodResolver(step2Schema),
     defaultValues: { farmSize: 2 },
   })
 
-  const onStep1 = (data) => {
+  const emailWatch = step1Form.watch('email') || ''
+  const isAdminSetup = useMemo(() => isSuperAdminEmail(emailWatch), [emailWatch])
+
+  const password = step1Form.watch('password') || ''
+  const confirmPassword = step1Form.watch('confirmPassword') || ''
+  const confirmMismatch =
+    confirmPassword.length > 0 && password !== confirmPassword
+  const confirmMatch =
+    confirmPassword.length > 0 && password.length >= 6 && password === confirmPassword
+  const confirmLiveError =
+    step1Form.formState.errors.confirmPassword?.message ||
+    (confirmMismatch ? 'Passwords do not match' : undefined)
+
+  const finishRegistration = async (user, token, options = {}) => {
+    useFarmStore.getState().resetFarmData()
+    registerUser(user, token)
+
+    if (user.role !== 'admin' && options.location?.label) {
+      const savedLoc = user.location?.label
+        ? { ...user.location, source: user.location.source || 'saved' }
+        : { ...options.location, source: 'saved' }
+      const patch = {
+        location: savedLoc,
+        region: savedLoc.label || user.region || '',
+      }
+      if (user.farmSize && Number(user.farmSize) > 0) {
+        patch.area = Number(user.farmSize)
+      }
+      useFarmStore.getState().updateSoilData(patch)
+    }
+
+    const home = homePathForUser(user)
+    if (user.role === 'admin') {
+      toast.success('Admin account ready', 'Your password is set. You can sign in anytime.')
+    } else {
+      toast.success('Welcome to FarmSense!', `Your farm in ${options.location?.label} is ready.`)
+    }
+    navigate(home)
+  }
+
+  const onStep1 = async (data) => {
     setFormData((prev) => ({ ...prev, ...data }))
+
+    if (isSuperAdminEmail(data.email)) {
+      setLoading(true)
+      try {
+        const { user, token } = await authService.register({
+          name: data.name,
+          email: data.email,
+          password: data.password,
+        })
+        await finishRegistration(user, token)
+      } catch (err) {
+        toast.error('Registration failed', getErrorMessage(err, 'Could not create your account'))
+      } finally {
+        setLoading(false)
+      }
+      return
+    }
+
     setStep(2)
   }
 
@@ -64,9 +134,7 @@ export default function Register() {
         farmSize: fullData.farmSize,
         location,
       })
-      registerUser(user, token)
-      toast.success('Welcome to FarmSense!', `Your farm in ${location.label} is ready.`)
-      navigate('/dashboard')
+      await finishRegistration(user, token, { location })
     } catch (err) {
       toast.error('Registration failed', getErrorMessage(err, 'Could not create your account'))
     } finally {
@@ -88,17 +156,19 @@ export default function Register() {
           animate={{ opacity: 1, y: 0 }}
           className="w-full max-w-[400px]"
         >
-          <div className="mb-6">
-            <p className="text-sm text-text-muted dark:text-text-dark-muted mb-2">
-              Step {step} of 2
-            </p>
-            <div className="h-1 rounded-full bg-surface-alt dark:bg-surface-dark-alt overflow-hidden">
-              <div
-                className="h-full bg-primary transition-all duration-300"
-                style={{ width: step === 1 ? '50%' : '100%' }}
-              />
+          {!isAdminSetup && (
+            <div className="mb-6">
+              <p className="text-sm text-text-muted dark:text-text-dark-muted mb-2">
+                Step {step} of 2
+              </p>
+              <div className="h-1 rounded-full bg-surface-alt dark:bg-surface-dark-alt overflow-hidden">
+                <div
+                  className="h-full bg-primary transition-all duration-300"
+                  style={{ width: step === 1 ? '50%' : '100%' }}
+                />
+              </div>
             </div>
-          </div>
+          )}
 
           <Card variant="elevated" className="p-6 overflow-hidden">
             <AnimatePresence mode="wait">
@@ -109,9 +179,13 @@ export default function Register() {
                   animate={{ opacity: 1, x: 0 }}
                   exit={{ opacity: 0, x: -20 }}
                 >
-                  <h1 className="font-display text-2xl font-semibold mb-1">Create your account</h1>
+                  <h1 className="font-display text-2xl font-semibold mb-1">
+                    {isAdminSetup ? 'Admin setup' : 'Create your account'}
+                  </h1>
                   <p className="text-sm text-text-secondary dark:text-text-dark-secondary mb-6">
-                    Let's start with the basics
+                    {isAdminSetup
+                      ? 'Create your admin password (first time only). Later you will sign in normally.'
+                      : "Let's start with the basics"}
                   </p>
                   <form onSubmit={step1Form.handleSubmit(onStep1)} className="space-y-4">
                     <Input
@@ -134,8 +208,22 @@ export default function Register() {
                       error={step1Form.formState.errors.password?.message}
                       {...step1Form.register('password')}
                     />
-                    <Button type="submit" className="w-full">
-                      Continue
+                    <Input
+                      label="Confirm password"
+                      type="password"
+                      icon={Lock}
+                      autoComplete="new-password"
+                      error={confirmLiveError}
+                      success={confirmMatch ? 'Passwords match' : undefined}
+                      {...step1Form.register('confirmPassword')}
+                    />
+                    <Button
+                      type="submit"
+                      className="w-full"
+                      loading={loading}
+                      disabled={confirmMismatch || !step1Form.formState.isValid}
+                    >
+                      {isAdminSetup ? 'Create admin account' : 'Continue'}
                     </Button>
                   </form>
                 </motion.div>

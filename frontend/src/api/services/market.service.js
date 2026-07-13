@@ -1,7 +1,7 @@
 import { apiConfig, backendEndpoints } from '../config'
 import { backendClient } from '../backend/client'
 import { withMockDelay } from '../mock/utils'
-import { marketData, crops, generatePriceData } from '../mock/data'
+import { marketData, crops } from '../mock/data'
 
 export const marketService = {
   async getMarketData(crop = 'Tomato') {
@@ -22,6 +22,4 @@ export const marketService = {
 
     return backendClient.get(`${backendEndpoints.market}/crops`)
   },
-
-  generatePriceData,
 }

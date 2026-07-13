@@ -6,8 +6,8 @@
  *   client.js          → Shared HTTP client (all fetch goes through here)
  *   external/          → Third-party connectors (Nominatim, postcodes.io, GPS)
  *   backend/           → FarmSense FastAPI client
- *   mock/              → Mock data + utilities (dev until backend is ready)
- *   services/          → Domain services (what pages/hooks should import)
+ *   mock/              → Offline fallback only (VITE_USE_MOCK_API=true)
+ *   services/          → Domain services — call FastAPI by default
  *
  * Usage in components/hooks:
  *   import { locationService, dashboardService } from '@/api'
@@ -32,4 +32,5 @@ export {
   farmService,
   soilService,
   systemService,
+  adminService,
 } from './services'

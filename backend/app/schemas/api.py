@@ -37,17 +37,23 @@ class OversupplyInput(BaseModel):
 
 
 class RegisterRequest(BaseModel):
+    """Farmers must send region + farmSize. Super-admin email may omit farm fields."""
+
     name: str = Field(min_length=2, max_length=120)
     email: str = Field(max_length=255)
     password: str = Field(min_length=6, max_length=128)
-    region: str = Field(min_length=2, max_length=160)
-    farmSize: float = Field(gt=0, le=500)
+    region: str | None = Field(default=None, max_length=160)
+    farmSize: float | None = Field(default=None, gt=0, le=500)
     location: dict | None = None
 
 
 class LoginRequest(BaseModel):
     email: str
     password: str
+
+
+class AdminFarmerStatusRequest(BaseModel):
+    isActive: bool
 
 
 class ForgotPasswordRequest(BaseModel):
@@ -57,3 +63,18 @@ class ForgotPasswordRequest(BaseModel):
 class ResetPasswordRequest(BaseModel):
     token: str = Field(min_length=20, max_length=200)
     password: str = Field(min_length=6, max_length=128)
+
+
+class ConfirmPlanRequest(BaseModel):
+    """Finalize selected crops from the latest draft recommendation run."""
+
+    cropIds: list[int] = Field(min_length=1, max_length=10)
+
+
+class AdminModelTestRequest(BaseModel):
+    """Admin model lab — run one pipeline layer with optional JSON body."""
+
+    layer: str = Field(
+        description="soil | weather | price | demand | trends | recommendation"
+    )
+    payload: dict | None = None

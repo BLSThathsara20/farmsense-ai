@@ -12,7 +12,7 @@ from sqlalchemy import desc, select, text
 from sqlalchemy.orm import Session
 
 from app.core.config import get_settings
-from app.core.deps import IdempotencyGuard, get_current_user, idempotency_key_header
+from app.core.deps import IdempotencyGuard, get_current_user, idempotency_key_header, require_admin
 from app.core.exceptions import (
     AppError,
     ServiceUnavailableError,
@@ -25,6 +25,9 @@ from app.db.models import SoilReading, UserAccount
 from app.db.session import SessionLocal, get_db
 from app.ml_service import ModelNotFoundError, district_oversupply_warning, predict_suitability, rank_by_profit
 from app.schemas import (
+    AdminFarmerStatusRequest,
+    AdminModelTestRequest,
+    ConfirmPlanRequest,
     CropScore,
     ForgotPasswordRequest,
     LoginRequest,
@@ -34,12 +37,23 @@ from app.schemas import (
     SoilInput,
     SoilSubmitRequest,
 )
+from app.services.admin_service import (
+    admin_analytics,
+    admin_overview,
+    delete_farmer,
+    get_farmer,
+    list_farmers,
+    set_farmer_active,
+)
+from app.services.model_lab_service import DEFAULT_PAYLOADS, model_lab_status, run_model_lab
 from app.services.auth_service import login_user, register_user, user_to_json
 from app.services.password_reset_service import request_password_reset, reset_password
 from app.services.profile_service import get_user_profile
 from app.services.recommendation_service import (
     community_payload,
     dashboard_payload,
+    delete_recommendation_plans,
+    finalize_recommendation_run,
     generate_recommendation_run,
     get_market_payload,
     latest_recommendations,
@@ -70,6 +84,15 @@ async def lifespan(app: FastAPI):
         load_model()
     except Exception:
         pass
+
+    # Warm heavy L2/L3 LSTM models so first Plan submit is not cold-start slow
+    if settings.ml_heavy:
+        try:
+            from app.ml.lstm_inference import warm_lstm_models
+
+            warm_lstm_models()
+        except Exception:
+            pass
 
     yield
 
@@ -116,6 +139,7 @@ def build_router() -> APIRouter:
     def health_ready(request: Request, db: Annotated[Session, Depends(get_db)]):
         db_ok = False
         ml_ok = False
+        layers = {"l1_soil": False, "l2_weather": False, "l3_price": False, "heavy": settings.ml_heavy}
         try:
             db.execute(text("SELECT 1"))
             db_ok = True
@@ -126,13 +150,29 @@ def build_router() -> APIRouter:
 
             get_model()
             ml_ok = True
+            layers["l1_soil"] = True
         except Exception:
             pass
+        if settings.ml_heavy:
+            try:
+                from app.ml.lstm_inference import tensorflow_available, warm_lstm_models
+
+                if tensorflow_available():
+                    status = warm_lstm_models()
+                    layers["l2_weather"] = bool(status.get("weather"))
+                    layers["l3_price"] = bool(status.get("price"))
+            except Exception:
+                pass
         status = "ready" if db_ok and ml_ok else "degraded"
         code = 200 if db_ok else 503
         return ORJSONResponse(
             status_code=code,
-            content={"status": status, "database": db_ok, "ml_model": ml_ok},
+            content={
+                "status": status,
+                "database": db_ok,
+                "ml_model": ml_ok,
+                "layers": layers,
+            },
         )
 
     @router.post("/auth/register")
@@ -218,8 +258,38 @@ def build_router() -> APIRouter:
         farm = get_primary_farm(db, user)
         recs = latest_recommendations(db, farm)
         if not recs:
-            return {"recommendations": [], "topRecommendation": None, "runDate": None}
+            return {"recommendations": [], "topRecommendation": None, "runDate": None, "planStatus": None}
         return recs
+
+    @router.post("/recommendations/confirm")
+    @limiter.limit("30/minute")
+    def confirm_recommendations(
+        request: Request,
+        payload: ConfirmPlanRequest,
+        db: Annotated[Session, Depends(get_db)],
+        user: Annotated[UserAccount, Depends(get_current_user)],
+    ):
+        farm = get_primary_farm(db, user)
+        try:
+            return finalize_recommendation_run(db, farm, payload.cropIds)
+        except ValueError as exc:
+            raise HTTPException(status_code=400, detail=str(exc)) from exc
+
+    @router.delete("/recommendations/plan")
+    @limiter.limit("20/minute")
+    def delete_plan(
+        request: Request,
+        db: Annotated[Session, Depends(get_db)],
+        user: Annotated[UserAccount, Depends(get_current_user)],
+    ):
+        """Permanently delete the farm's crop recommendation plan(s). Soil readings are kept."""
+        from app.core.middleware import response_cache
+
+        farm = get_primary_farm(db, user)
+        result = delete_recommendation_plans(db, farm)
+        key = cache_key("GET", "/dashboard", "", str(user.id))
+        response_cache.pop(key, None)
+        return result
 
     @router.get("/dashboard")
     @limiter.limit(settings.rate_limit_default)
@@ -287,6 +357,107 @@ def build_router() -> APIRouter:
         payload = community_payload(db, farm)
         set_cached_response(key, payload)
         return payload
+
+    # —— Super admin (privacy-limited farmer oversight) ——
+    @router.get("/admin/overview")
+    @limiter.limit(settings.rate_limit_default)
+    def admin_overview_endpoint(
+        request: Request,
+        db: Annotated[Session, Depends(get_db)],
+        _admin: Annotated[UserAccount, Depends(require_admin)],
+    ):
+        return admin_overview(db)
+
+    @router.get("/admin/analytics")
+    @limiter.limit(settings.rate_limit_default)
+    def admin_analytics_endpoint(
+        request: Request,
+        db: Annotated[Session, Depends(get_db)],
+        _admin: Annotated[UserAccount, Depends(require_admin)],
+    ):
+        return admin_analytics(db)
+
+    @router.get("/admin/farmers")
+    @limiter.limit(settings.rate_limit_default)
+    def admin_farmers_list(
+        request: Request,
+        db: Annotated[Session, Depends(get_db)],
+        _admin: Annotated[UserAccount, Depends(require_admin)],
+        q: Annotated[str | None, Query()] = None,
+        page: Annotated[int, Query(ge=1)] = 1,
+        limit: Annotated[int, Query(ge=1, le=100)] = 20,
+    ):
+        return list_farmers(db, q=q, page=page, limit=limit)
+
+    @router.get("/admin/farmers/{farmer_id}")
+    @limiter.limit(settings.rate_limit_default)
+    def admin_farmer_detail(
+        request: Request,
+        farmer_id: str,
+        db: Annotated[Session, Depends(get_db)],
+        _admin: Annotated[UserAccount, Depends(require_admin)],
+    ):
+        import uuid as uuid_mod
+
+        try:
+            uid = uuid_mod.UUID(farmer_id)
+        except ValueError as exc:
+            raise HTTPException(status_code=400, detail="Invalid farmer id") from exc
+        return get_farmer(db, uid)
+
+    @router.patch("/admin/farmers/{farmer_id}")
+    @limiter.limit("30/minute")
+    def admin_farmer_status(
+        request: Request,
+        farmer_id: str,
+        payload: AdminFarmerStatusRequest,
+        db: Annotated[Session, Depends(get_db)],
+        _admin: Annotated[UserAccount, Depends(require_admin)],
+    ):
+        import uuid as uuid_mod
+
+        try:
+            uid = uuid_mod.UUID(farmer_id)
+        except ValueError as exc:
+            raise HTTPException(status_code=400, detail="Invalid farmer id") from exc
+        return set_farmer_active(db, uid, payload.isActive)
+
+    @router.delete("/admin/farmers/{farmer_id}")
+    @limiter.limit("20/minute")
+    def admin_farmer_delete(
+        request: Request,
+        farmer_id: str,
+        db: Annotated[Session, Depends(get_db)],
+        _admin: Annotated[UserAccount, Depends(require_admin)],
+    ):
+        import uuid as uuid_mod
+
+        try:
+            uid = uuid_mod.UUID(farmer_id)
+        except ValueError as exc:
+            raise HTTPException(status_code=400, detail="Invalid farmer id") from exc
+        return delete_farmer(db, uid)
+
+    @router.get("/admin/models/status")
+    @limiter.limit(settings.rate_limit_default)
+    def admin_models_status(
+        request: Request,
+        _admin: Annotated[UserAccount, Depends(require_admin)],
+    ):
+        """Artefact readiness for the model lab playground."""
+        status = model_lab_status()
+        status["defaults"] = DEFAULT_PAYLOADS
+        return status
+
+    @router.post("/admin/models/test")
+    @limiter.limit("30/minute")
+    def admin_models_test(
+        request: Request,
+        body: AdminModelTestRequest,
+        _admin: Annotated[UserAccount, Depends(require_admin)],
+    ):
+        """Run one ML / demand layer with custom JSON — admin playground."""
+        return run_model_lab(body.layer, body.payload)
 
     # Legacy ML endpoints (dissertation Table 7.1 / pytest TC01–TC06)
     @router.post("/predict/suitability")

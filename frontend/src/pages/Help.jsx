@@ -55,8 +55,8 @@ export default function Help() {
       {mockMode && (
         <Card variant="highlight" className="mb-4">
           <p className="text-sm">
-            <strong>Mock mode is on.</strong> Set <code className="text-xs bg-surface-alt px-1 rounded">VITE_USE_MOCK_API=false</code> in{' '}
-            <code className="text-xs bg-surface-alt px-1 rounded">.env</code> and restart the dev server to use the real API.
+            <strong>Mock mode is on.</strong> Remove <code className="text-xs bg-surface-alt px-1 rounded">VITE_USE_MOCK_API=true</code> from{' '}
+            <code className="text-xs bg-surface-alt px-1 rounded">.env</code> (or set it to <code className="text-xs bg-surface-alt px-1 rounded">false</code>) and restart the dev server to use the real API.
           </p>
         </Card>
       )}

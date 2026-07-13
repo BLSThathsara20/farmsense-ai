@@ -16,3 +16,6 @@ email-validator>=2.0.0
 cachetools>=5.5.0
 orjson>=3.10.0
 slowapi>=0.1.9
+# Heavy L2/L3 LSTM inference (weather + price). Use `tensorflow` (not tensorflow-cpu)
+# so linux/arm64 Docker on Apple Silicon can resolve wheels.
+tensorflow>=2.16.0,<2.20.0

@@ -17,6 +17,7 @@ export const dashboardService = {
         recommendations,
         soilReadings,
         currentFarmer: farmers[0],
+        hasSoilData: true,
       })
     }
 

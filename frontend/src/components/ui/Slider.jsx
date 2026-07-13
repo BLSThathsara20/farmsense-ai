@@ -60,7 +60,7 @@ export function Slider({
 
 export function getNutrientLabel(value) {
   if (value <= 33) return 'Low'
-  if (value <= 66) return 'Medium'
+  if (value <= 66) return 'Average'
   return 'High'
 }
 
