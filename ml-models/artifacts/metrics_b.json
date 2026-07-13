@@ -1,0 +1,11 @@
+{
+  "model": "L3 LSTM price",
+  "baseline": "ARIMA(2,1,2)",
+  "lstm_mape_pct": 4.96,
+  "arima_mape_pct": 9.55,
+  "lstm_rmse": 5.9589,
+  "lstm_mae": 5.2512,
+  "lstm_beats_arima": true,
+  "nfr4_target_pct": 15,
+  "nfr4_pass": true
+}

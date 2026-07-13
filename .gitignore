@@ -1,0 +1,39 @@
+# Dependencies & build
+node_modules/
+dist/
+*.log
+.DS_Store
+
+# Secrets — keep examples
+.env
+.env.local
+.env.*.local
+!.env.example
+
+# Python
+__pycache__/
+*.py[cod]
+.venv/
+venv/
+*.egg-info/
+
+# ML — keep trained artifacts needed by the API; ignore heavy training data & local envs
+ml-models/.venv/
+ml-models/data/archive/
+ml-models/data/**/*.parquet
+ml-models/data/sentiment/twitter_data.csv
+ml-models/data/sentiment/reddit_data.csv
+temporary/
+tempory/
+
+# Large / local-only training dumps (not required to run the app)
+ml-models/**/*.pt
+ml-models/**/*.onnx
+
+# IDE
+.vscode/
+.idea/
+*.swp
+
+# OS
+Thumbs.db

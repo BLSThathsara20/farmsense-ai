@@ -1,0 +1,453 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+	<meta charset="UTF-8">
+	<meta name="viewport" content="width=device-width, initial-scale=1.0">
+	<title>FarmSense AI — Database Design Plan</title>
+	<script src="https://cdn.jsdelivr.net/npm/mermaid@11/dist/mermaid.min.js"></script>
+	<style>
+		:root {
+			--bg: #0b1220;
+			--paper: #ffffff;
+			--ink: #0f172a;
+			--muted: #475569;
+			--border: #e2e8f0;
+			--accent: #059669;
+			--accent-soft: #ecfdf5;
+			--warn: #b45309;
+			--warn-soft: #fffbeb;
+			--bad: #be123c;
+			--soft: #f8fafc;
+			--mono: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+			--sans: ui-sans-serif, system-ui, -apple-system, Segoe UI, Roboto, Helvetica, Arial, sans-serif;
+		}
+		* { box-sizing: border-box; }
+		body {
+			margin: 0;
+			background: linear-gradient(180deg, #0b1220, #020617);
+			font-family: var(--sans);
+			color: var(--paper);
+			line-height: 1.55;
+		}
+		.shell { max-width: 1080px; margin: 0 auto; padding: 28px 16px 48px; }
+		.topbar {
+			display: flex; flex-wrap: wrap; gap: 12px;
+			align-items: center; justify-content: space-between;
+			margin-bottom: 16px;
+		}
+		.brand { font-weight: 700; font-size: 18px; letter-spacing: -0.02em; }
+		.badge {
+			font-size: 12px; padding: 6px 10px; border-radius: 999px;
+			background: rgba(255,255,255,.08); border: 1px solid rgba(255,255,255,.14);
+		}
+		.paper {
+			background: var(--paper); color: var(--ink);
+			border-radius: 16px; border: 1px solid var(--border);
+			box-shadow: 0 24px 60px rgba(0,0,0,.35); overflow: hidden;
+		}
+		.paper-inner { padding: 28px 32px 40px; }
+		h1 { margin: 0 0 8px; font-size: 26px; letter-spacing: -0.03em; }
+		h2 {
+			margin: 28px 0 12px; font-size: 18px;
+			border-bottom: 2px solid var(--accent); padding-bottom: 6px;
+		}
+		h3 { margin: 20px 0 8px; font-size: 15px; }
+		p, li { font-size: 14px; }
+		.lead { color: var(--muted); font-size: 15px; max-width: 75ch; }
+		a { color: #047857; }
+		.callout {
+			background: var(--accent-soft); border-left: 4px solid var(--accent);
+			padding: 12px 14px; border-radius: 0 10px 10px 0; margin: 14px 0; font-size: 14px;
+		}
+		.callout.warn { background: var(--warn-soft); border-left-color: var(--warn); }
+		.tag {
+			display: inline-block; font-size: 11px; font-weight: 700;
+			padding: 2px 8px; border-radius: 999px; margin-right: 6px;
+			text-transform: uppercase; letter-spacing: .04em;
+		}
+		.tag.must { background: #dcfce7; color: #166534; }
+		.tag.rec { background: #dbeafe; color: #1e40af; }
+		.tag.privacy { background: #fce7f3; color: #9d174d; }
+		table.data {
+			width: 100%; border-collapse: collapse; font-size: 13px; margin: 12px 0;
+		}
+		table.data th, table.data td {
+			border: 1px solid var(--border); padding: 9px 10px;
+			text-align: left; vertical-align: top;
+		}
+		table.data th { background: var(--soft); font-weight: 600; }
+		table.data tr:nth-child(even) td { background: #fafafa; }
+		code, .path {
+			font-family: var(--mono); font-size: 12px;
+			background: var(--soft); padding: 2px 6px; border-radius: 4px;
+		}
+		.path-block {
+			background: #0f172a; color: #e2e8f0; padding: 14px 16px;
+			border-radius: 10px; font-family: var(--mono); font-size: 12px;
+			line-height: 1.7; white-space: pre; overflow-x: auto; margin: 10px 0;
+		}
+		.grid-2 { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; }
+		@media (max-width: 720px) { .grid-2 { grid-template-columns: 1fr; } }
+		.card {
+			border: 1px solid var(--border); border-radius: 12px;
+			padding: 14px 16px; background: var(--soft);
+		}
+		.card h3 { margin-top: 0; }
+		.tiny { font-size: 12px; color: var(--muted); }
+		.checklist { list-style: none; padding: 0; margin: 0; }
+		.checklist li {
+			padding: 8px 0; border-bottom: 1px dashed var(--border);
+			display: flex; gap: 10px; align-items: flex-start; font-size: 14px;
+		}
+		.checklist input { margin-top: 4px; accent-color: var(--accent); }
+		.mermaid-wrap {
+			background: #fff; border: 1px solid var(--border);
+			border-radius: 12px; padding: 16px; margin: 14px 0; overflow-x: auto;
+		}
+		.footer {
+			margin-top: 24px; padding-top: 16px; border-top: 1px solid var(--border);
+			font-size: 12px; color: var(--muted);
+		}
+		nav.toc {
+			background: var(--soft); border: 1px solid var(--border);
+			border-radius: 12px; padding: 14px 18px; margin: 16px 0;
+		}
+		nav.toc ol { margin: 8px 0 0; padding-left: 20px; font-size: 14px; }
+		nav.toc a { text-decoration: none; }
+		nav.toc a:hover { text-decoration: underline; }
+	</style>
+</head>
+<body>
+	<div class="shell">
+		<div class="topbar">
+			<div class="brand">FarmSense AI — Database Design Plan</div>
+			<span class="badge">LD6053 · Ch.5 §5.2 · PostgreSQL 16</span>
+		</div>
+
+		<div class="paper">
+			<div class="paper-inner">
+				<h1>Database design plan</h1>
+				<p class="lead">
+					Relational schema for FarmSense AI: farmer accounts, soil readings, ML recommendation audit trail,
+					market snapshots, and <strong>anonymised district aggregates</strong> (NFR2). Aligns with dissertation
+					<a href="../../Dissertation preparation/dissertation-template.html#ch5-2">§5.2</a> and
+					<code>desitation files/resources/ER diagram.png</code> (Figure 5.2).
+				</p>
+
+				<nav class="toc">
+					<strong>Contents</strong>
+					<ol>
+						<li><a href="#recommendation">Recommendation</a></li>
+						<li><a href="#principles">Design principles</a></li>
+						<li><a href="#entities">Entities &amp; FR traceability</a></li>
+						<li><a href="#er">ER diagram</a></li>
+						<li><a href="#tables">Table definitions</a></li>
+						<li><a href="#json">JSON shapes (API contract)</a></li>
+						<li><a href="#queries">Key queries</a></li>
+						<li><a href="#docker">Docker &amp; local setup</a></li>
+						<li><a href="#checklist">Implementation checklist</a></li>
+					</ol>
+				</nav>
+
+				<h2 id="recommendation">1. Recommendation</h2>
+				<div class="grid-2">
+					<div class="card">
+						<h3><span class="tag must">Use</span> PostgreSQL 16</h3>
+						<p>Already chosen in your dissertation stack (§5.5). Strong JSONB support for ranked recommendation audit, ACID for user data, free, and works with FastAPI + SQLAlchemy.</p>
+					</div>
+					<div class="card">
+						<h3><span class="tag rec">ORM</span> SQLAlchemy 2 + Alembic</h3>
+						<p>Migrations track schema changes for viva evidence. Alternative for speed: run <code>database/init.sql</code> once, then add Alembic when tables change.</p>
+					</div>
+				</div>
+
+				<div class="callout">
+					<strong>v1 scope:</strong> One <code>farm_profile</code> per user is enough for the dissertation prototype.
+					Multi-farm support is a one-to-many relationship already — add UI later without schema changes.
+				</div>
+
+				<div class="callout warn">
+					<strong>Do not store in PostgreSQL:</strong> raw ML model files (.pkl, .h5) — keep those in
+					<code>ml-models/artifacts/</code>. The DB stores <em>outputs</em> and metadata only.
+				</div>
+
+				<h2 id="principles">2. Design principles</h2>
+				<ul>
+					<li><strong>Lineage:</strong> account → farm → soil reading → recommendation run (audit for FR6).</li>
+					<li><strong>Privacy (NFR2):</strong> <code>district_crop_aggregate</code> stores counts only — no user IDs in collective tables.</li>
+					<li><strong>Reference vs transactional:</strong> <code>crop_reference</code> and <code>market_snapshot</code> are shared; user tables are isolated per account.</li>
+					<li><strong>JSONB audit:</strong> <code>recommendation_run.ranked_output</code> mirrors the React API shape so pytest and UI stay aligned.</li>
+					<li><strong>UK focus:</strong> <code>district_code</code> can use ONS codes later; free-text district name is fine for prototype.</li>
+				</ul>
+
+				<h2 id="entities">3. Entities &amp; FR traceability</h2>
+				<table class="data">
+					<thead>
+						<tr><th>Table</th><th>Dissertation entity</th><th>Requirements</th><th>Purpose</th></tr>
+					</thead>
+					<tbody>
+						<tr>
+							<td><code>user_account</code></td>
+							<td>User_Account</td>
+							<td>FR1</td>
+							<td>Login, JWT subject, role (farmer/admin)</td>
+						</tr>
+						<tr>
+							<td><code>farm_profile</code></td>
+							<td>Farm_Profile</td>
+							<td>FR1</td>
+							<td>Location, district, area, water source</td>
+						</tr>
+						<tr>
+							<td><code>soil_reading</code></td>
+							<td>Soil_Reading</td>
+							<td>FR1, FR2</td>
+							<td>N, P, K, pH, texture — feeds L1 RF</td>
+						</tr>
+						<tr>
+							<td><code>recommendation_run</code></td>
+							<td>Recommendation_Run</td>
+							<td>FR6, FR2–FR6</td>
+							<td>Ranked JSON, model version, explainability</td>
+						</tr>
+						<tr>
+							<td><code>crop_reference</code></td>
+							<td>Crop_Reference</td>
+							<td>FR2–FR6</td>
+							<td>Slug, display name, L1 model label mapping</td>
+						</tr>
+						<tr>
+							<td><code>market_snapshot</code></td>
+							<td>Market_Snapshot</td>
+							<td>FR4, FR5</td>
+							<td>Weekly price + demand scores per crop</td>
+						</tr>
+						<tr>
+							<td><code>district_crop_aggregate</code></td>
+							<td>— (collective)</td>
+							<td>FR7, RQ3, NFR2</td>
+							<td>Anonymised planting counts per district/crop/week</td>
+						</tr>
+						<tr>
+							<td><code>oversupply_alert</code></td>
+							<td>Oversupply_Alert</td>
+							<td>FR7, TC06</td>
+							<td>Threshold warnings when count ≥ limit</td>
+						</tr>
+						<tr>
+							<td><code>confirmed_crop_plan</code></td>
+							<td>— (bridge)</td>
+							<td>FR7</td>
+							<td>Farmer confirms a plan → increments district aggregate</td>
+						</tr>
+					</tbody>
+				</table>
+
+				<h2 id="er">4. ER diagram</h2>
+				<p class="tiny">Matches Figure 5.2 with district aggregate tables added for FR7. Copy Mermaid into dissertation <code>er_mermaid</code> section if needed.</p>
+				<div class="mermaid-wrap">
+					<pre class="mermaid">
+erDiagram
+    USER_ACCOUNT ||--o{ FARM_PROFILE : owns
+    FARM_PROFILE ||--o{ SOIL_READING : has
+    FARM_PROFILE ||--o{ RECOMMENDATION_RUN : generates
+    FARM_PROFILE ||--o{ CONFIRMED_CROP_PLAN : confirms
+    SOIL_READING ||--o| RECOMMENDATION_RUN : inputs
+    CROP_REFERENCE ||--o{ MARKET_SNAPSHOT : priced_as
+    CROP_REFERENCE ||--o{ CONFIRMED_CROP_PLAN : selects
+    CROP_REFERENCE ||--o{ DISTRICT_CROP_AGGREGATE : counted_in
+    CROP_REFERENCE ||--o{ OVERSUPPLY_ALERT : warns_for
+    RECOMMENDATION_RUN ||--o{ CONFIRMED_CROP_PLAN : sources
+
+    USER_ACCOUNT {
+        uuid id PK
+        string email UK
+        string password_hash
+        enum role
+    }
+    FARM_PROFILE {
+        uuid id PK
+        uuid user_id FK
+        string district_code
+        string district_name
+        decimal area_hectares
+    }
+    SOIL_READING {
+        uuid id PK
+        uuid farm_profile_id FK
+        decimal nitrogen
+        decimal phosphorus
+        decimal potassium
+        decimal ph
+        jsonb crop_preferences
+    }
+    RECOMMENDATION_RUN {
+        uuid id PK
+        uuid farm_profile_id FK
+        jsonb ranked_output
+        string model_bundle_version
+        enum status
+    }
+    CROP_REFERENCE {
+        int id PK
+        string slug UK
+        string l1_label
+    }
+    MARKET_SNAPSHOT {
+        bigint id PK
+        int crop_id FK
+        date week_start
+        decimal price_gbp_per_tonne
+    }
+    DISTRICT_CROP_AGGREGATE {
+        bigint id PK
+        string district_code
+        int crop_id FK
+        int plan_count
+    }
+    OVERSUPPLY_ALERT {
+        uuid id PK
+        string district_code
+        int threshold_count
+        int current_count
+    }
+					</pre>
+				</div>
+
+				<h2 id="tables">5. Table definitions (summary)</h2>
+				<table class="data">
+					<thead>
+						<tr><th>Table</th><th>Key columns</th><th>Notes</th></tr>
+					</thead>
+					<tbody>
+						<tr>
+							<td><code>user_account</code></td>
+							<td><code>id</code> UUID, <code>email</code> UNIQUE, <code>password_hash</code>, <code>role</code></td>
+							<td>Bcrypt/argon2 hash; never store plain passwords</td>
+						</tr>
+						<tr>
+							<td><code>farm_profile</code></td>
+							<td><code>user_id</code>, <code>district_code</code>, <code>district_name</code>, <code>area_hectares</code></td>
+							<td>Index on <code>district_code</code> for community queries</td>
+						</tr>
+						<tr>
+							<td><code>soil_reading</code></td>
+							<td>N, P, K, <code>ph</code> CHECK 0–14, <code>texture</code>, <code>crop_preferences</code> JSONB</td>
+							<td>Matches RF features + UI SoilInput form</td>
+						</tr>
+						<tr>
+							<td><code>recommendation_run</code></td>
+							<td><code>ranked_output</code> JSONB, <code>top_crop</code>, <code>model_bundle_version</code></td>
+							<td>Full audit trail for Ch.7 evaluation</td>
+						</tr>
+						<tr>
+							<td><code>crop_reference</code></td>
+							<td><code>slug</code>, <code>display_name</code>, <code>l1_label</code></td>
+							<td>Map UI crops to L1 RF labels (22-class set)</td>
+						</tr>
+						<tr>
+							<td><code>market_snapshot</code></td>
+							<td><code>crop_id</code>, <code>week_start</code>, <code>price_gbp_per_tonne</code>, <code>trend_pct</code></td>
+							<td>UNIQUE (crop, source, week) prevents duplicate imports</td>
+						</tr>
+						<tr>
+							<td><code>district_crop_aggregate</code></td>
+							<td><code>district_code</code>, <code>crop_id</code>, <code>plan_count</code></td>
+							<td><span class="tag privacy">No PII</span> — counts only</td>
+						</tr>
+						<tr>
+							<td><code>oversupply_alert</code></td>
+							<td><code>threshold_count</code>, <code>current_count</code>, <code>risk_level</code></td>
+							<td>TC06: <code>current_count &gt;= threshold_count</code> → warning</td>
+						</tr>
+					</tbody>
+				</table>
+				<p>Full DDL: <code>farmsense-ai/database/init.sql</code></p>
+
+				<h2 id="json">6. JSON shapes (API contract)</h2>
+				<p>Store this in <code>recommendation_run.ranked_output</code> — matches your React mock and pytest contract:</p>
+				<div class="path-block">{
+  "recommendations": [
+    {
+      "crop": "maize",
+      "rank": 1,
+      "confidence": 92,
+      "profitEstimate": 4200,
+      "soilMatch": 94,
+      "weatherFit": 88,
+      "priceTrend": 76,
+      "demandSignal": 85,
+      "plantingWindow": { "sow": "Week 3–4", "harvest": "Week 14–16", "sell": "Week 8–10" },
+      "oversupplyRisk": 0.15,
+      "reasoning": "..."
+    }
+  ],
+  "topRecommendation": { "...": "..." },
+  "runDate": "2026-07-09T12:00:00Z",
+  "modelLayers": { "l1": "rf_suitability.pkl", "l3": "lstm_price.h5" }
+}</div>
+
+				<h2 id="queries">7. Key queries</h2>
+				<h3>Latest recommendation for a farm</h3>
+				<div class="path-block">SELECT ranked_output, top_crop, created_at
+FROM recommendation_run
+WHERE farm_profile_id = $1
+ORDER BY created_at DESC
+LIMIT 1;</div>
+
+				<h3>District popularity (Community page)</h3>
+				<div class="path-block">SELECT c.display_name AS crop, a.plan_count AS farmers,
+       ROUND(100.0 * a.plan_count / SUM(a.plan_count) OVER (), 1) AS percentage
+FROM district_crop_aggregate a
+JOIN crop_reference c ON c.id = a.crop_id
+WHERE a.district_code = $1 AND a.season_year = $2 AND a.week_number = $3
+ORDER BY a.plan_count DESC;</div>
+
+				<h3>Oversupply check (TC06 logic)</h3>
+				<div class="path-block">SELECT district_code, crop_id, plan_count AS current_count,
+       $threshold AS threshold_count,
+       (plan_count >= $threshold) AS warning
+FROM district_crop_aggregate
+WHERE district_code = $1 AND crop_id = $2;</div>
+
+				<h2 id="docker">8. Docker &amp; local setup</h2>
+				<p>Start PostgreSQL locally (one command):</p>
+				<div class="path-block">cd farmsense-ai
+docker run --name farmsense-db -e POSTGRES_PASSWORD=farmsense \
+  -e POSTGRES_DB=farmsense -p 5432:5432 -d postgres:16
+
+# Apply schema
+docker exec -i farmsense-db psql -U postgres -d farmsense &lt; database/init.sql</div>
+
+				<p>Backend <code>.env</code> (add when wiring SQLAlchemy):</p>
+				<div class="path-block">DATABASE_URL=postgresql+psycopg://postgres:farmsense@localhost:5432/farmsense
+JWT_SECRET=change-me-in-production</div>
+
+				<p class="tiny">Suggested Python packages: <code>sqlalchemy&gt;=2.0</code>, <code>psycopg[binary]</code>, <code>alembic</code>, <code>passlib[bcrypt]</code>, <code>python-jose</code>.</p>
+
+				<h2 id="checklist">9. Implementation checklist</h2>
+				<ul class="checklist">
+					<li><input type="checkbox" disabled> Run <code>database/init.sql</code> on PostgreSQL 16</li>
+					<li><input type="checkbox" disabled> Add <code>DATABASE_URL</code> to backend <code>.env</code></li>
+					<li><input type="checkbox" disabled> Create SQLAlchemy models mirroring tables</li>
+					<li><input type="checkbox" disabled> Wire <code>POST /auth/register</code> and <code>POST /auth/login</code> (FR1)</li>
+					<li><input type="checkbox" disabled> Wire <code>POST /soil</code> → insert <code>soil_reading</code></li>
+					<li><input type="checkbox" disabled> Wire <code>GET /recommendations</code> → call ML + save <code>recommendation_run</code></li>
+					<li><input type="checkbox" disabled> Wire <code>GET /community</code> from <code>district_crop_aggregate</code></li>
+					<li><input type="checkbox" disabled> Set <code>VITE_USE_MOCK_API=false</code> in frontend when live</li>
+					<li><input type="checkbox" disabled> Uncomment PostgreSQL service in <code>docker-compose.yml</code></li>
+				</ul>
+
+				<div class="footer">
+					Files: <code>farmsense-ai/database/init.sql</code> ·
+					<code>farmsense-ai/database/database-design-plan.html</code> ·
+					Dissertation §5.2 / Figure 5.2 · Student 25055042
+				</div>
+			</div>
+		</div>
+	</div>
+	<script>
+		mermaid.initialize({ startOnLoad: true, theme: 'neutral', er: { layoutDirection: 'TB' } });
+	</script>
+</body>
+</html>

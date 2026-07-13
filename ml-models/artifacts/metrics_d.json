@@ -1,0 +1,39 @@
+{
+  "model": "L4 Demand",
+  "nlp_optimization": "GridSearchCV LogisticRegression+TF-IDF",
+  "nlp_best_params": {
+    "clf__C": 10
+  },
+  "nlp_f1_weighted": 0.767,
+  "nlp_f1_macro": 0.7497,
+  "nlp_accuracy": 0.7694,
+  "trends_vs_price": {
+    "source": "offline_sentiment_proxy",
+    "aligned_weeks": 147,
+    "keywords": [
+      "wheat",
+      "potato",
+      "barley"
+    ],
+    "results": [
+      {
+        "keyword": "wheat",
+        "pearson_r": 0.00257520900488469,
+        "p_value": 0.9753044257801639,
+        "rq2_significant": false
+      },
+      {
+        "keyword": "potato",
+        "pearson_r": 0.002575209004883257,
+        "p_value": 0.975304425780179,
+        "rq2_significant": false
+      },
+      {
+        "keyword": "barley",
+        "pearson_r": null,
+        "p_value": null,
+        "rq2_significant": false
+      }
+    ]
+  }
+}

@@ -1,0 +1,49 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>FarmSense AI — User Help Guide</title>
+  <style>
+    :root { font-family: Inter, system-ui, sans-serif; line-height: 1.6; color: #18181b; max-width: 720px; margin: 2rem auto; padding: 0 1.25rem; }
+    h1 { font-size: 1.75rem; }
+    h2 { font-size: 1.1rem; margin-top: 2rem; }
+    code, pre { background: #f4f4f5; border-radius: 6px; font-size: 0.85rem; }
+    code { padding: 0.15rem 0.35rem; }
+    pre { padding: 1rem; overflow-x: auto; }
+    .ok { color: #16a34a; font-weight: 600; }
+  </style>
+</head>
+<body>
+  <h1>FarmSense AI — Help Guide</h1>
+  <p>Register, connect the frontend to the backend, and confirm your data is saved in PostgreSQL.</p>
+
+  <h2>1. Start services</h2>
+  <pre>cd farmsense-ai && docker compose up -d
+cd frontend && npm run dev</pre>
+  <p>Open <strong>http://localhost:5173</strong>. Ensure <code>VITE_USE_MOCK_API=false</code> in <code>frontend/.env</code>.</p>
+
+  <h2>2. Register &amp; sign in</h2>
+  <p>Anyone can create an account. Your name, email, farm region, and size are stored in the database.</p>
+
+  <h2>3. Add soil data (Plan)</h2>
+  <p>Submit N, P, K, pH, and location. The API runs the Random Forest model and saves a recommendation run.</p>
+
+  <h2>4. Check Settings</h2>
+  <ul>
+    <li><strong>System status</strong> — API, PostgreSQL, ML model health</li>
+    <li><strong>Saved data</strong> — soil reading count, recommendation runs, last update dates</li>
+  </ul>
+
+  <h2>5. Return later</h2>
+  <p class="ok">Yes — sign in days or weeks later and your profile and crop history are still there.</p>
+  <p>Settings → Saved data shows counts from the server. Dashboard loads from <code>GET /dashboard</code>.</p>
+
+  <h2>Health endpoints</h2>
+  <ul>
+    <li><code>GET http://localhost:8000/health</code></li>
+    <li><code>GET http://localhost:8000/health/ready</code> (database + ML)</li>
+    <li><code>GET http://localhost:8000/auth/me</code> (requires login token)</li>
+  </ul>
+</body>
+</html>

@@ -1,0 +1,8 @@
+{
+  "model": "L2 LSTM weather",
+  "target": "weekly UK mean temperature",
+  "horizon_weeks": 4,
+  "rmse_celsius": 3.6654,
+  "mae_celsius": 2.5762,
+  "test_weeks": 26
+}

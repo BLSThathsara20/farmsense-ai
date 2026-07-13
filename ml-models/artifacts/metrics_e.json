@@ -1,0 +1,41 @@
+{
+  "model": "L5 Ranking",
+  "optimization": "GridSearchCV XGBRegressor",
+  "xgb_best_params": {
+    "max_depth": 6,
+    "n_estimators": 100
+  },
+  "weights": {
+    "suitability": 0.35,
+    "weather": 0.2,
+    "price": 0.3,
+    "demand": 0.15
+  },
+  "scenarios": [
+    {
+      "scenario": "Heavy clay",
+      "soil_only_crop": "maize",
+      "soil_only_score": 0.6,
+      "full_pipeline_crop": "maize",
+      "full_pipeline_score": 0.5988,
+      "full_pipeline_wins": false
+    },
+    {
+      "scenario": "Sandy loam",
+      "soil_only_crop": "maize",
+      "soil_only_score": 0.355,
+      "full_pipeline_crop": "maize",
+      "full_pipeline_score": 0.513,
+      "full_pipeline_wins": true
+    },
+    {
+      "scenario": "Chalk down",
+      "soil_only_crop": "maize",
+      "soil_only_score": 0.46,
+      "full_pipeline_crop": "maize",
+      "full_pipeline_score": 0.5498,
+      "full_pipeline_wins": true
+    }
+  ],
+  "rq1_supported": true
+}

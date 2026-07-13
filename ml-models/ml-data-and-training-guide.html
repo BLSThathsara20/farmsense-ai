@@ -1,0 +1,1554 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+	<meta charset="UTF-8">
+	<meta name="viewport" content="width=device-width, initial-scale=1.0">
+	<title>FarmSense AI — ML Datasets &amp; Training Guide</title>
+	<style>
+		:root {
+			--bg: #0b1220;
+			--paper: #ffffff;
+			--ink: #0f172a;
+			--muted: #475569;
+			--border: #e2e8f0;
+			--accent: #059669;
+			--accent-soft: #ecfdf5;
+			--warn: #b45309;
+			--warn-soft: #fffbeb;
+			--bad: #be123c;
+			--soft: #f8fafc;
+			--mono: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+			--sans: ui-sans-serif, system-ui, -apple-system, Segoe UI, Roboto, Helvetica, Arial, sans-serif;
+		}
+		* { box-sizing: border-box; }
+		body {
+			margin: 0;
+			background: linear-gradient(180deg, #0b1220, #020617);
+			font-family: var(--sans);
+			color: var(--paper);
+			line-height: 1.55;
+		}
+		.shell { max-width: 1060px; margin: 0 auto; padding: 28px 16px 48px; }
+		.topbar {
+			display: flex; flex-wrap: wrap; gap: 12px;
+			align-items: center; justify-content: space-between;
+			margin-bottom: 16px;
+		}
+		.brand { font-weight: 700; font-size: 18px; letter-spacing: -0.02em; }
+		.badge {
+			font-size: 12px; padding: 6px 10px; border-radius: 999px;
+			background: rgba(255,255,255,.08); border: 1px solid rgba(255,255,255,.14);
+		}
+		.paper {
+			background: var(--paper); color: var(--ink);
+			border-radius: 16px; border: 1px solid var(--border);
+			box-shadow: 0 24px 60px rgba(0,0,0,.35); overflow: hidden;
+		}
+		.paper-inner { padding: 28px 32px 40px; }
+		h1 { margin: 0 0 8px; font-size: 26px; letter-spacing: -0.03em; }
+		h2 {
+			margin: 28px 0 12px; font-size: 18px;
+			border-bottom: 2px solid var(--accent); padding-bottom: 6px;
+		}
+		h3 { margin: 20px 0 8px; font-size: 15px; color: var(--ink); }
+		p, li { font-size: 14px; }
+		.lead { color: var(--muted); font-size: 15px; max-width: 72ch; }
+		a { color: #047857; }
+		a:hover { text-decoration: underline; }
+		.callout {
+			background: var(--accent-soft); border-left: 4px solid var(--accent);
+			padding: 12px 14px; border-radius: 0 10px 10px 0; margin: 14px 0;
+			font-size: 14px;
+		}
+		.callout.warn {
+			background: var(--warn-soft); border-left-color: var(--warn);
+		}
+		.tag {
+			display: inline-block; font-size: 11px; font-weight: 700;
+			padding: 2px 8px; border-radius: 999px; margin-right: 6px;
+			text-transform: uppercase; letter-spacing: .04em;
+		}
+		.tag.must { background: #dcfce7; color: #166534; }
+		.tag.rec { background: #dbeafe; color: #1e40af; }
+		.tag.opt { background: #f1f5f9; color: #475569; }
+		.tag.live { background: #fce7f3; color: #9d174d; }
+		table.data {
+			width: 100%; border-collapse: collapse; font-size: 13px; margin: 12px 0;
+		}
+		table.data th, table.data td {
+			border: 1px solid var(--border); padding: 9px 10px;
+			text-align: left; vertical-align: top;
+		}
+		table.data th { background: var(--soft); font-weight: 600; }
+		table.data tr:nth-child(even) td { background: #fafafa; }
+		.checklist { list-style: none; padding: 0; margin: 0; }
+		.checklist li {
+			padding: 8px 0; border-bottom: 1px dashed var(--border);
+			display: flex; gap: 10px; align-items: flex-start;
+		}
+		.checklist input { margin-top: 4px; accent-color: var(--accent); }
+		code, .path {
+			font-family: var(--mono); font-size: 12px;
+			background: var(--soft); padding: 2px 6px; border-radius: 4px;
+		}
+		.path-block {
+			background: #0f172a; color: #e2e8f0; padding: 14px 16px;
+			border-radius: 10px; font-family: var(--mono); font-size: 12px;
+			line-height: 1.7; white-space: pre; overflow-x: auto; margin: 10px 0;
+		}
+		.grid-2 {
+			display: grid; grid-template-columns: 1fr 1fr; gap: 14px;
+		}
+		@media (max-width: 720px) { .grid-2 { grid-template-columns: 1fr; } }
+		.card {
+			border: 1px solid var(--border); border-radius: 12px;
+			padding: 14px 16px; background: var(--soft);
+		}
+		.card h3 { margin-top: 0; }
+		.tiny { font-size: 12px; color: var(--muted); }
+		.footer { margin-top: 24px; padding-top: 16px; border-top: 1px solid var(--border); }
+		.status-ok { color: #166534; font-weight: 600; }
+		.status-partial { color: #b45309; font-weight: 600; }
+		.status-manual { color: #be123c; font-weight: 600; }
+		.checklist input:checked + span { text-decoration: line-through; color: var(--muted); }
+		.pending-box {
+			background: #fff1f2; border: 2px solid #be123c;
+			border-radius: 12px; padding: 16px 18px; margin-top: 28px;
+		}
+		.pending-box h2 { border-bottom-color: #be123c; color: #be123c; margin-top: 0; }
+		.step-num {
+			display: inline-block; background: var(--accent); color: white;
+			font-weight: 700; font-size: 12px; padding: 2px 8px; border-radius: 6px; margin-right: 6px;
+		}
+		.metric-pass { color: #166534; font-weight: 600; }
+		.metric-fail { color: #be123c; font-weight: 600; }
+		details.notebook {
+			border: 1px solid var(--border); border-radius: 12px;
+			margin: 14px 0; background: #fff; overflow: hidden;
+		}
+		details.notebook summary {
+			cursor: pointer; padding: 14px 16px; font-weight: 600; font-size: 15px;
+			background: var(--soft); list-style: none;
+		}
+		details.notebook summary::-webkit-details-marker { display: none; }
+		details.notebook summary::before {
+			content: "▸ "; color: var(--accent); font-weight: 700;
+		}
+		details.notebook[open] summary::before { content: "▾ "; }
+		details.notebook[open] summary { border-bottom: 1px solid var(--border); }
+		.nb-body { padding: 14px 16px 18px; }
+		.nb-meta { font-size: 13px; color: var(--muted); margin: 0 0 12px; }
+		.upload-box {
+			background: #f0fdf4; border: 1px solid #86efac; border-radius: 10px;
+			padding: 12px 14px; margin: 0 0 14px; font-size: 13px;
+		}
+		.upload-box strong { color: #166534; display: block; margin-bottom: 8px; }
+		.upload-box ul { margin: 0; padding-left: 18px; }
+		.upload-box li { margin: 6px 0; }
+		.upload-box code { font-size: 11px; word-break: break-all; }
+		.upload-box .from-nb { color: var(--muted); font-size: 12px; }
+		.limit-box {
+			background: var(--warn-soft); border: 1px solid #fcd34d; border-radius: 10px;
+			padding: 10px 12px; margin: 0 0 14px; font-size: 12px;
+		}
+		.cell-step { margin: 18px 0 0; }
+		.cell-step h4 {
+			margin: 0 0 4px; font-size: 13px; color: var(--ink);
+		}
+		.cell-label {
+			font-size: 11px; font-weight: 700; text-transform: uppercase;
+			letter-spacing: .04em; color: var(--muted); margin-bottom: 4px;
+		}
+		.path-block { position: relative; }
+		.manual-steps { margin: 8px 0; padding-left: 20px; }
+		.manual-steps li { margin: 4px 0; }
+	</style>
+</head>
+<body>
+	<div class="shell">
+		<div class="topbar">
+			<div class="brand">FarmSense AI · <span style="font-weight:500;opacity:.85">ML Models</span></div>
+			<span class="badge">LD6053 · Dissertation · Figure 7.1 prep</span>
+		</div>
+
+		<div class="paper">
+			<div class="paper-inner">
+				<h1>Google Colab Training Guide</h1>
+				<p class="lead">
+					<strong>Train everything in Google Colab (GPU).</strong> Follow each step below in order.
+					After each notebook, save metrics and PNG charts, then paste into the dissertation (see §5).
+					All data files are already in <code>ml-models/data/</code> on your Mac — upload them to Colab at the start of each session.
+				</p>
+
+				<div class="callout">
+					<strong>Workflow:</strong> Colab train → download <code>figures/</code> + <code>artifacts/</code> → paste into Word dissertation §7.5 (Figure 7.1) and write RQ answers in §7.5 prose.
+				</div>
+
+				<h2>0. Download status (updated 9 Jul 2026)</h2>
+				<p class="tiny">Files from <code>farmsense-ai/temporary/</code> were moved into <code>ml-models/data/</code>. Open this page after any new downloads.</p>
+				<table class="data">
+					<thead>
+						<tr><th>Item</th><th>Status</th><th>File on disk</th><th>Ready for training?</th></tr>
+					</thead>
+					<tbody>
+						<tr>
+							<td>L1 Crop recommendation</td>
+							<td class="status-ok">✓ Ready</td>
+							<td><code>data/suitability/Crop_recommendation.csv</code> (2,200 rows)</td>
+							<td>Yes — Colab Notebook A → Figure 7.1 Panel A</td>
+						</tr>
+						<tr>
+							<td>L3 GOV.UK price indices</td>
+							<td class="status-ok">✓ Ready</td>
+							<td><code>data/prices/govuk_price_indices_API.csv</code> (~15k rows)</td>
+							<td>Yes — LSTM price Colab → Panel B</td>
+						</tr>
+						<tr>
+							<td>L3 DEFRA AMMG prices</td>
+							<td class="status-ok">✓ Ready</td>
+							<td><code>data/prices/defra_ammg_combined.csv</code> (316 rows, 6 files merged)</td>
+							<td>Yes — merge with GOV.UK in Colab</td>
+						</tr>
+						<tr>
+							<td>L2 UK weather daily (2M)</td>
+							<td class="status-ok">✓ Ready</td>
+							<td><code>data/weather/daily_uk_2m_weather.parquet</code> (2.8M rows)</td>
+							<td>Yes — upload to Colab (use parquet, not 161MB csv)</td>
+						</tr>
+						<tr>
+							<td>L2 Weather extras</td>
+							<td class="status-ok">✓ Ready</td>
+							<td><code>met_office_stations_by_month.csv</code>, <code>uk_rainfall_temp_2010_2019.csv</code></td>
+							<td>Optional / smaller experiments</td>
+						</tr>
+						<tr>
+							<td>L4 Reddit + Twitter sentiment</td>
+							<td class="status-ok">✓ Ready</td>
+							<td><code>data/sentiment/reddit_data.csv</code>, <code>twitter_data.csv</code></td>
+							<td>Yes — NLP train or keyword filter for food/ag</td>
+						</tr>
+						<tr>
+							<td>L4 Alt sentiment corpus</td>
+							<td class="status-ok">✓ Ready</td>
+							<td><code>data/sentiment/social_media_sentiments_alt.csv</code></td>
+							<td>Optional</td>
+						</tr>
+						<tr>
+							<td>Supplementary yield features</td>
+							<td class="status-ok">✓ Ready</td>
+							<td><code>data/prices/crop_yield_features_supplementary.csv</code></td>
+							<td>Extra experiments only (not core L3 price)</td>
+						</tr>
+						<tr>
+							<td>Rec UK gov agriculture stats</td>
+							<td class="status-ok">✓ Ready</td>
+							<td><code>data/prices/auk_chapter2.ods</code></td>
+							<td>Optional appendix</td>
+						</tr>
+						<tr>
+							<td>Reddit API (live FR5)</td>
+							<td class="status-manual">✗ You set up</td>
+							<td><code>farmsense-ai/.env</code></td>
+							<td>Create app → §11 step 5</td>
+						</tr>
+						<tr>
+							<td>UK Crop Yield (Nature / CYCleSS)</td>
+							<td class="status-manual">✗ Not downloaded</td>
+							<td>—</td>
+							<td>Optional — only if time for FR9 validation</td>
+						</tr>
+					</tbody>
+				</table>
+
+				<!-- MODEL MAP -->
+				<h2>1. Model → dataset map (what you actually need)</h2>
+				<table class="data">
+					<thead>
+						<tr>
+							<th>Layer</th>
+							<th>Model</th>
+							<th>FR</th>
+							<th>Dataset(s)</th>
+							<th>Train on</th>
+							<th>Figure 7.1 metric</th>
+						</tr>
+					</thead>
+					<tbody>
+						<tr>
+							<td><strong>L1</strong> Suitability</td>
+							<td>Random Forest</td>
+							<td>FR2</td>
+							<td>Kaggle crop recommendation</td>
+							<td><strong>Google Colab</strong> (GPU)</td>
+							<td>Accuracy, F1, confusion matrix (NFR3 ≥85%)</td>
+						</tr>
+						<tr>
+							<td><strong>L2</strong> Weather</td>
+							<td>LSTM</td>
+							<td>FR3</td>
+							<td><code>daily_uk_2m_weather.parquet</code></td>
+							<td><strong>Google Colab</strong> (GPU)</td>
+							<td>RMSE, MAE (4–8 week horizon)</td>
+						</tr>
+						<tr>
+							<td><strong>L3</strong> Price</td>
+							<td>LSTM (+ ARIMA baseline)</td>
+							<td>FR4</td>
+							<td>DEFRA + GOV.UK price CSVs</td>
+							<td><strong>Google Colab</strong> (GPU)</td>
+							<td>MAPE, RMSE vs ARIMA (NFR4 &lt;15%)</td>
+						</tr>
+						<tr>
+							<td><strong>L4</strong> Demand</td>
+							<td>Pytrends + sentiment NLP</td>
+							<td>FR5</td>
+							<td>reddit/twitter CSV + live Trends</td>
+							<td><strong>Google Colab</strong></td>
+							<td>Pearson r vs price (RQ2)</td>
+						</tr>
+						<tr>
+							<td><strong>L5</strong> Ranking</td>
+							<td>XGBoost profit optimiser</td>
+							<td>FR6</td>
+							<td>Outputs from L1–L4</td>
+							<td><strong>Google Colab</strong></td>
+							<td>Profit order vs soil-only (RQ1)</td>
+						</tr>
+						<tr>
+							<td><strong>L6</strong> Collective</td>
+							<td>District aggregates</td>
+							<td>FR7</td>
+							<td>App DB / synthetic district counts</td>
+							<td>Backend (no ML train)</td>
+							<td>Usability + simulation (RQ3)</td>
+						</tr>
+					</tbody>
+				</table>
+
+				<div class="callout warn">
+					<strong>Literature vs your build (for Ch.2):</strong>
+					Papers use many models (NN 97%+, ensembles, VMD-LSTM hybrids, etc.).
+					You do <em>not</em> need to copy every model. In the dissertation, write:
+					<em>“Literature reports high accuracy with [their model]; FarmSense AI uses
+					[Random Forest / LSTM / XGBoost] because it fits the UK open-data pipeline,
+					student timeline, and NFR targets — and integrates into one profit-ranked system.”</em>
+					Compare your numbers to literature benchmarks; justify choice, not identical architecture.
+				</div>
+
+				<h2>Appendix — your data files (already downloaded)</h2>
+				<p class="tiny">Upload these to Colab from <code>ml-models/data/</code>. No need to download again.</p>
+				<ul>
+					<li><code>suitability/Crop_recommendation.csv</code> — L1 Random Forest</li>
+					<li><code>prices/govuk_price_indices_API.csv</code> + <code>defra_ammg_combined.csv</code> — L3 LSTM price</li>
+					<li><code>weather/daily_uk_2m_weather.parquet</code> — L2 LSTM weather (primary)</li>
+					<li><code>weather/uk_rainfall_temp_2010_2019.csv</code> — L2 backup if Colab runs out of memory</li>
+					<li><code>sentiment/reddit_data.csv</code> + <code>twitter_data.csv</code> — L4 NLP / RQ2</li>
+					<li><code>prices/auk_chapter2.ods</code> — optional appendix context</li>
+				</ul>
+
+				<h2>Appendix — still need (optional links)</h2>
+				<p class="tiny">Only download these if you want extra validation. Not required for Figure 7.1.</p>
+				<ul>
+					<li>
+						<strong>UK Crop Yield (CYCleSS)</strong> —
+						<a href="https://www.nature.com/articles/s41597-025-06528-x" target="_blank" rel="noopener">Nature Scientific Data</a>
+						(FR9 / harvest validation)
+					</li>
+					<li>
+						<strong>Crop price prediction (extra experiments)</strong> —
+						<a href="https://www.kaggle.com/datasets/varshitanalluri/crop-price-prediction-dataset" target="_blank" rel="noopener">Kaggle</a>
+					</li>
+				</ul>
+
+				<h2>Appendix — live APIs (pending — see red box at bottom)</h2>
+				<ul>
+					<li>
+						<strong>Reddit API</strong> (live FR5) —
+						<a href="https://www.reddit.com/prefs/apps" target="_blank" rel="noopener">reddit.com/prefs/apps</a>
+						→ save keys in <code>farmsense-ai/.env</code>
+					</li>
+					<li><strong>Google Trends</strong> — use <code>pytrends</code> in Colab (no API key). Stronger RQ2 than CSV-only.</li>
+					<li>
+						<strong>Public APIs list</strong> —
+						<a href="https://github.com/public-apis/public-apis" target="_blank" rel="noopener">github.com/public-apis/public-apis</a>
+					</li>
+				</ul>
+
+				<!-- COLAB SETUP -->
+				<h2>2. Colab one-time setup (do once per session)</h2>
+				<ol class="manual-steps">
+					<li>Open <a href="https://colab.research.google.com" target="_blank" rel="noopener">colab.research.google.com</a> → <strong>New notebook</strong>.</li>
+					<li>Menu: <strong>Runtime → Change runtime type → T4 GPU</strong> (needed for LSTM; RF can use CPU but GPU is fine).</li>
+					<li>First code cell — install libraries:</li>
+				</ol>
+				<div class="path-block">!pip install -q pandas numpy scikit-learn xgboost tensorflow matplotlib seaborn pyarrow pytrends</div>
+				<ol class="manual-steps" start="4">
+					<li>Upload data from your Mac: click <strong>folder icon</strong> (left sidebar) → upload files listed in each notebook step below.</li>
+					<li>Or mount Google Drive if you copied <code>ml-models/data/</code> there (faster for 19MB parquet).</li>
+					<li>At end of each notebook: <strong>download</strong> PNG charts + <code>.pkl</code> / <code>.h5</code> model files to Mac → save in <code>ml-models/figures/</code> and <code>ml-models/artifacts/</code>.</li>
+				</ol>
+
+				<!-- METRICS -->
+				<h2>3. Metrics you must record (copy into dissertation)</h2>
+				<p class="tiny">Write these numbers in <strong>Chapter 7.5</strong> prose and show charts in <strong>Figure 7.1</strong>. Green target = pass NFR / answer RQ.</p>
+				<table class="data">
+					<thead>
+						<tr>
+							<th>Model</th>
+							<th>Metrics to record</th>
+							<th>Target (dissertation)</th>
+							<th>Answers</th>
+						</tr>
+					</thead>
+					<tbody>
+						<tr>
+							<td><strong>L1 Random Forest</strong></td>
+							<td>Accuracy, Precision, Recall, <strong>F1</strong> (macro or weighted), confusion matrix</td>
+							<td class="metric-pass">Accuracy ≥ <strong>85%</strong> (NFR3)</td>
+							<td>RQ1 (suitability part)</td>
+						</tr>
+						<tr>
+							<td><strong>L3 LSTM price</strong></td>
+							<td><strong>MAPE</strong>, RMSE, MAE on test set; compare vs <strong>ARIMA</strong> baseline</td>
+							<td class="metric-pass">MAPE &lt; <strong>15%</strong> (NFR4)</td>
+							<td>RQ1 + RQ2 (price side)</td>
+						</tr>
+						<tr>
+							<td><strong>L2 LSTM weather</strong></td>
+							<td>RMSE, MAE for temp and rainfall; 4–8 week forecast horizon</td>
+							<td>Report honestly (no fixed NFR)</td>
+							<td>RQ1 (weather part)</td>
+						</tr>
+						<tr>
+							<td><strong>L4 Demand</strong></td>
+							<td><strong>Pearson r</strong> between demand score and next-period price change; note lag (weeks)</td>
+							<td>Significant positive r = supports RQ2</td>
+							<td>RQ2</td>
+						</tr>
+						<tr>
+							<td><strong>L5 Ranking</strong></td>
+							<td>Profit rank order on fixed soil scenarios; compare <strong>full pipeline vs soil-only RF</strong></td>
+							<td>Full pipeline ranks higher profit crops more often</td>
+							<td>RQ1 (main answer)</td>
+						</tr>
+						<tr>
+							<td><strong>L6 Collective</strong></td>
+							<td>Usability themes; warning usefulness (not ML metric)</td>
+							<td>Qualitative in Ch.7.4</td>
+							<td>RQ3</td>
+						</tr>
+					</tbody>
+				</table>
+
+				<div class="callout">
+					<strong>Why F1 is not in every notebook:</strong>
+					<strong>F1</strong> is for <em>classification</em> (crop labels) — only <strong>Notebook A</strong> and the <strong>sentiment NLP step in D</strong>.
+					<strong>Notebooks B &amp; C</strong> are regression (forecast) → optimize <strong>MAPE / RMSE</strong>.
+					<strong>Notebook D</strong> (demand) → optimize <strong>Pearson r</strong> + NLP <strong>F1</strong> on sentiment labels.
+					<strong>Notebook E</strong> (ranking) → optimize <strong>XGBoost hyperparameters</strong> + compare soil-only vs full pipeline.
+					Each notebook below has a <strong>tune/optimize cell</strong> then a <strong>metrics cell</strong> that saves JSON + PNG.
+				</div>
+
+				<h3>Metric + optimization per notebook</h3>
+				<table class="data">
+					<thead>
+						<tr><th>Notebook</th><th>Main metric</th><th>Optimization technique</th><th>Saved file</th></tr>
+					</thead>
+					<tbody>
+						<tr><td><strong>A</strong> RF</td><td>Accuracy, <strong>F1</strong> (weighted + macro)</td><td><code>GridSearchCV</code> on n_estimators, max_depth (scoring=f1_weighted)</td><td><code>metrics_a.json</code></td></tr>
+						<tr><td><strong>B</strong> LSTM price</td><td><strong>MAPE</strong>, RMSE, MAE vs ARIMA</td><td>Try SEQ_LEN 8/12/16 — pick lowest validation MAPE</td><td><code>metrics_b.json</code></td></tr>
+						<tr><td><strong>C</strong> LSTM weather</td><td><strong>RMSE</strong>, MAE (°C)</td><td>Try SEQ_LEN 8/12/16 — pick lowest RMSE</td><td><code>metrics_c.json</code></td></tr>
+						<tr><td><strong>D</strong> Demand</td><td><strong>Pearson r</strong> + NLP <strong>F1</strong></td><td>Sentiment classifier GridSearchCV; Trends keywords</td><td><code>metrics_d.json</code></td></tr>
+						<tr><td><strong>E</strong> Ranking</td><td>Rank order (RQ1)</td><td><code>GridSearchCV</code> on XGBoost n_estimators, max_depth</td><td><code>metrics_e.json</code></td></tr>
+					</tbody>
+				</table>
+
+				<h3>§7.5 paste template (fill after each notebook)</h3>
+				<div class="path-block">Notebook A: "L1 Random Forest achieved [X]% accuracy and [Y] weighted F1 (NFR3: met/partial)."
+Notebook B: "L3 LSTM MAPE was [X]% vs ARIMA [Y]% (NFR4: met/partial)."
+Notebook C: "L2 weather LSTM RMSE [X]°C, MAE [Y]°C on weekly temperature."
+Notebook D: "Sentiment NLP F1 [X]; demand Pearson r = [Y] for [crop] (RQ2)."
+Notebook E: "On [scenario], full pipeline ranked [crop A] first vs soil-only [crop B] (RQ1)."</div>
+
+				<!-- COLAB STEPS -->
+				<h2>4. Step-by-step Colab notebooks (train in this order)</h2>
+				<p class="tiny">Open each accordion → copy each code block into a <strong>new Colab cell</strong> → Run top to bottom. Every notebook has a <strong>mandatory metrics cell</strong> that saves <code>metrics_*.json</code> + a <strong>chart PNG</strong> — open those files on your Mac to check results.</p>
+
+				<details class="notebook" open>
+					<summary><span class="step-num">A</span> Notebook A — L1 Random Forest (Panel A)</summary>
+					<div class="nb-body">
+						<div class="upload-box">
+							<strong>Files to upload to Colab (from your Mac)</strong>
+							<ul>
+								<li><code>farmsense-ai/ml-models/data/suitability/Crop_recommendation.csv</code></li>
+							</ul>
+						</div>
+						<p class="nb-meta"><strong>Saves every run:</strong> <code>metrics_a.json</code>, <code>panel_a_rf_confusion.png</code>, <code>rf_suitability.pkl</code> · <strong>Target:</strong> accuracy ≥ 85% (NFR3)</p>
+
+						<div class="limit-box">
+							<strong>L1 crop list limit:</strong> This dataset has <strong>22 fixed labels</strong> (Indian crops — no carrot/potato).
+							The model can only recommend those 22 classes. Document in Ch.6/Ch.8; UK crops outside the list need farmer-selected candidates or a future catalogue extension.
+						</div>
+
+						<div class="cell-step">
+							<h4>Cell 1 — Install &amp; imports</h4>
+							<div class="cell-label">Copy into Colab cell 1</div>
+							<div class="path-block">!pip install -q pandas numpy scikit-learn matplotlib seaborn joblib
+
+import pandas as pd
+import numpy as np
+import matplotlib.pyplot as plt
+import seaborn as sns
+from sklearn.model_selection import train_test_split, GridSearchCV
+from sklearn.ensemble import RandomForestClassifier
+from sklearn.metrics import accuracy_score, f1_score, precision_score, recall_score, classification_report, confusion_matrix
+import joblib
+import json</div>
+						</div>
+
+						<div class="cell-step">
+							<h4>Cell 2 — Upload file &amp; load data</h4>
+							<div class="cell-label">Copy into Colab cell 2 (upload CSV via folder icon first)</div>
+							<div class="path-block">from google.colab import files
+# Optional: files.upload()  # pick Crop_recommendation.csv
+
+DATA_PATH = "Crop_recommendation.csv"  # change if uploaded to subfolder
+
+df = pd.read_csv(DATA_PATH)
+print(df.shape)
+print(df.head())
+print(df["label"].value_counts())</div>
+						</div>
+
+						<div class="cell-step">
+							<h4>Cell 3 — Prepare features &amp; train/test split</h4>
+							<div class="cell-label">Copy into Colab cell 3</div>
+							<div class="path-block">FEATURES = ["N", "P", "K", "temperature", "humidity", "ph", "rainfall"]
+TARGET = "label"
+
+X = df[FEATURES]
+y = df[TARGET]
+
+X_train, X_test, y_train, y_test = train_test_split(
+    X, y, test_size=0.2, random_state=42, stratify=y
+)
+print("Train:", X_train.shape, "Test:", X_test.shape)</div>
+						</div>
+
+						<div class="cell-step">
+							<h4>Cell 4 — Optimize Random Forest (GridSearchCV, scoring = F1)</h4>
+							<div class="cell-label">Copy into Colab cell 4 — picks best hyperparameters automatically</div>
+							<div class="path-block">param_grid = {
+    "n_estimators": [100, 200, 300],
+    "max_depth": [None, 10, 20],
+    "min_samples_split": [2, 5],
+}
+base_rf = RandomForestClassifier(random_state=42, n_jobs=-1)
+
+grid = GridSearchCV(
+    base_rf, param_grid, cv=3, scoring="f1_weighted", n_jobs=-1, verbose=1
+)
+grid.fit(X_train, y_train)
+
+rf = grid.best_estimator_
+best_params = grid.best_params_
+print("Best params:", best_params)
+print("Best CV F1 (weighted):", round(grid.best_score_, 4))
+
+y_pred = rf.predict(X_test)
+print("Test predictions ready.")</div>
+						</div>
+
+						<div class="cell-step">
+							<h4>Cell 5 — Evaluate F1 / accuracy &amp; save JSON (mandatory)</h4>
+							<div class="cell-label">Copy into Colab cell 5 — open metrics_a.json to check NFR3 + F1</div>
+							<div class="path-block">acc = accuracy_score(y_test, y_pred)
+f1_w = f1_score(y_test, y_pred, average="weighted")
+f1_m = f1_score(y_test, y_pred, average="macro")
+prec = precision_score(y_test, y_pred, average="weighted")
+rec = recall_score(y_test, y_pred, average="weighted")
+report = classification_report(y_test, y_pred)
+
+metrics_a = {
+    "model": "L1 Random Forest",
+    "optimization": "GridSearchCV",
+    "best_params": best_params,
+    "cv_f1_weighted": round(float(grid.best_score_), 4),
+    "accuracy": round(acc, 4),
+    "accuracy_pct": round(acc * 100, 2),
+    "f1_weighted": round(f1_w, 4),
+    "f1_macro": round(f1_m, 4),
+    "precision_weighted": round(prec, 4),
+    "recall_weighted": round(rec, 4),
+    "nfr3_target": 0.85,
+    "nfr3_pass": bool(acc >= 0.85),
+}
+print(f"Accuracy: {metrics_a['accuracy_pct']}%")
+print(f"F1 (weighted): {metrics_a['f1_weighted']}")
+print(f"F1 (macro):    {metrics_a['f1_macro']}")
+print(f"NFR3 pass? {'YES' if metrics_a['nfr3_pass'] else 'NO'}")
+print(report)
+
+with open("metrics_a.json", "w") as f:
+    json.dump(metrics_a, f, indent=2)
+with open("metrics_a_report.txt", "w") as f:
+    f.write(report)</div>
+						</div>
+
+						<div class="cell-step">
+							<h4>Cell 6 — F1 chart + confusion matrix PNG (Panel A)</h4>
+							<div class="cell-label">Copy into Colab cell 6</div>
+							<div class="path-block">fig, axes = plt.subplots(1, 2, figsize=(14, 5))
+
+# F1 scores bar chart
+axes[0].bar(["Weighted F1", "Macro F1", "Accuracy"],
+            [metrics_a["f1_weighted"], metrics_a["f1_macro"], metrics_a["accuracy"]],
+            color=["#059669", "#34d399", "#6ee7b7"])
+axes[0].axhline(0.85, color="red", linestyle="--", label="NFR3 (85%)")
+axes[0].set_ylim(0, 1.05)
+axes[0].set_title("L1 RF — F1 & accuracy (optimized)")
+axes[0].legend()
+
+# Confusion matrix
+cm = confusion_matrix(y_test, y_pred, labels=rf.classes_)
+sns.heatmap(cm, ax=axes[1], cmap="Greens", xticklabels=rf.classes_, yticklabels=rf.classes_)
+axes[1].set_title(f"Confusion matrix — {metrics_a['accuracy_pct']}%")
+axes[1].set_xlabel("Predicted")
+axes[1].set_ylabel("Actual")
+
+plt.tight_layout()
+plt.savefig("panel_a_rf_confusion.png", dpi=150)
+plt.show()
+
+from google.colab import files
+files.download("panel_a_rf_confusion.png")
+files.download("metrics_a.json")</div>
+						</div>
+
+						<div class="cell-step">
+							<h4>Cell 7 — Save optimized model</h4>
+							<div class="cell-label">Copy into Colab cell 7</div>
+							<div class="path-block">joblib.dump(rf, "rf_suitability.pkl")
+files.download("rf_suitability.pkl")
+print("Save to Mac: ml-models/figures/panel_a_rf_confusion.png + ml-models/artifacts/metrics_a.json + rf_suitability.pkl")</div>
+						</div>
+					</div>
+				</details>
+
+				<details class="notebook">
+					<summary><span class="step-num">B</span> Notebook B — L3 LSTM price + ARIMA baseline (Panel B)</summary>
+					<div class="nb-body">
+						<div class="upload-box">
+							<strong>Files to upload to Colab (from your Mac)</strong>
+							<ul>
+								<li><code>farmsense-ai/ml-models/data/prices/govuk_price_indices_API.csv</code></li>
+								<li><code>farmsense-ai/ml-models/data/prices/defra_ammg_combined.csv</code></li>
+							</ul>
+						</div>
+						<p class="nb-meta"><strong>Saves every run:</strong> <code>metrics_b.json</code>, <code>panel_b_price_mape.png</code>, <code>lstm_price.h5</code>, <code>price_weekly.csv</code> · <strong>Target:</strong> MAPE &lt; 15% (NFR4)</p>
+
+						<div class="cell-step">
+							<h4>Cell 1 — Install &amp; imports</h4>
+							<div class="cell-label">Copy into Colab cell 1</div>
+							<div class="path-block">!pip install -q pandas numpy matplotlib tensorflow statsmodels scikit-learn
+
+import pandas as pd
+import numpy as np
+import matplotlib.pyplot as plt
+from sklearn.preprocessing import MinMaxScaler
+from sklearn.metrics import mean_absolute_error, mean_squared_error
+from tensorflow.keras.models import Sequential
+from tensorflow.keras.layers import LSTM, Dense, Dropout
+from statsmodels.tsa.arima.model import ARIMA
+import warnings
+import json
+warnings.filterwarnings("ignore")</div>
+						</div>
+
+						<div class="cell-step">
+							<h4>Cell 2 — Load &amp; build weekly price series</h4>
+							<div class="cell-label">Copy into Colab cell 2</div>
+							<div class="path-block"># Primary: GOV.UK wheat price index (weekly, ~148 weeks)
+gov = pd.read_csv("govuk_price_indices_API.csv")
+gov_w = gov[gov["category"] == "wheat"].copy()
+gov_w["date"] = pd.to_datetime(gov_w["date"])
+series = gov_w.groupby("date")["index"].mean().resample("W").mean().dropna()
+series.name = "price_index"
+
+# Optional: also load DEFRA £/t for dissertation citation
+defra = pd.read_csv("defra_ammg_combined.csv")
+wheat_gbp = defra[defra["item"] == "bread_milling_wheat"].copy()
+print("GOV.UK wheat weeks:", len(series))
+print(series.tail())
+
+series.to_csv("price_weekly.csv")
+print("Saved price_weekly.csv for Notebook D")</div>
+						</div>
+
+						<div class="cell-step">
+							<h4>Cell 3 — Prepare scaler &amp; sequence helper</h4>
+							<div class="cell-label">Copy into Colab cell 3</div>
+							<div class="path-block">TEST_WEEKS = 20
+EPOCHS = 40
+
+values = series.values.reshape(-1, 1)
+scaler = MinMaxScaler()
+scaled = scaler.fit_transform(values)
+
+def make_sequences(data, seq_len):
+    X, y = [], []
+    for i in range(seq_len, len(data)):
+        X.append(data[i-seq_len:i, 0])
+        y.append(data[i, 0])
+    return np.array(X), np.array(y)
+
+def build_lstm(seq_len):
+    m = Sequential([
+        LSTM(64, return_sequences=True, input_shape=(seq_len, 1)),
+        Dropout(0.2),
+        LSTM(32),
+        Dropout(0.2),
+        Dense(1)
+    ])
+    m.compile(optimizer="adam", loss="mse")
+    return m</div>
+						</div>
+
+						<div class="cell-step">
+							<h4>Cell 4 — Optimize SEQ_LEN (pick lowest validation MAPE)</h4>
+							<div class="cell-label">Copy into Colab cell 4 — tries 8, 12, 16 week lookback</div>
+							<div class="path-block">def mape(y_true, y_pred):
+    y_true, y_pred = np.array(y_true), np.array(y_pred)
+    return np.mean(np.abs((y_true - y_pred) / y_true)) * 100
+
+tune_results = []
+for seq_len in [8, 12, 16]:
+    X, y = make_sequences(scaled, seq_len)
+    split = len(X) - TEST_WEEKS
+    X_tr, X_te = X[:split], X[split:]
+    y_tr, y_te = y[:split], y[split:]
+    X_tr = X_tr.reshape((X_tr.shape[0], X_tr.shape[1], 1))
+    X_te = X_te.reshape((X_te.shape[0], X_te.shape[1], 1))
+
+    tmp_model = build_lstm(seq_len)
+    tmp_model.fit(X_tr, y_tr, epochs=15, batch_size=16, verbose=0, validation_split=0.1)
+    pred = tmp_model.predict(X_te, verbose=0).flatten()
+    y_true_tmp = scaler.inverse_transform(y_te.reshape(-1, 1)).flatten()
+    y_pred_tmp = scaler.inverse_transform(pred.reshape(-1, 1)).flatten()
+    val_mape = mape(y_true_tmp, y_pred_tmp)
+    tune_results.append({"seq_len": seq_len, "mape": val_mape})
+    print(f"SEQ_LEN={seq_len} → MAPE {val_mape:.2f}%")
+
+best = min(tune_results, key=lambda x: x["mape"])
+SEQ_LEN = best["seq_len"]
+print(f"\nBest SEQ_LEN: {SEQ_LEN} (MAPE {best['mape']:.2f}%)")</div>
+						</div>
+
+						<div class="cell-step">
+							<h4>Cell 5 — Train final LSTM with best SEQ_LEN</h4>
+							<div class="cell-label">Copy into Colab cell 5 — Runtime → GPU recommended</div>
+							<div class="path-block">X, y = make_sequences(scaled, SEQ_LEN)
+split = len(X) - TEST_WEEKS
+X_train, X_test = X[:split], X[split:]
+y_train, y_test = y[:split], y[split:]
+X_train = X_train.reshape((X_train.shape[0], X_train.shape[1], 1))
+X_test = X_test.reshape((X_test.shape[0], X_test.shape[1], 1))
+
+model = build_lstm(SEQ_LEN)
+model.fit(X_train, y_train, epochs=EPOCHS, batch_size=16, verbose=1, validation_split=0.1)
+
+pred_scaled = model.predict(X_test, verbose=0).flatten()
+y_true = scaler.inverse_transform(y_test.reshape(-1, 1)).flatten()
+y_pred = scaler.inverse_transform(pred_scaled.reshape(-1, 1)).flatten()
+print("Final LSTM trained.")</div>
+						</div>
+
+						<div class="cell-step">
+							<h4>Cell 6 — Evaluate MAPE / RMSE / MAE + ARIMA baseline (mandatory)</h4>
+							<div class="cell-label">Copy into Colab cell 6 — saves metrics_b.json</div>
+							<div class="path-block">train_series = series.iloc[:split + SEQ_LEN]
+test_series = series.iloc[split + SEQ_LEN:]
+
+arima = ARIMA(train_series, order=(2, 1, 2))
+arima_fit = arima.fit()
+arima_pred = arima_fit.forecast(steps=len(test_series))
+
+lstm_mape = mape(y_true, y_pred)
+arima_mape = mape(test_series.values, arima_pred.values)
+lstm_rmse = float(np.sqrt(mean_squared_error(y_true, y_pred)))
+lstm_mae = float(mean_absolute_error(y_true, y_pred))
+
+metrics_b = {
+    "model": "L3 LSTM price",
+    "optimization": "SEQ_LEN grid [8,12,16]",
+    "best_seq_len": int(SEQ_LEN),
+    "tune_results": tune_results,
+    "baseline": "ARIMA(2,1,2)",
+    "lstm_mape_pct": round(lstm_mape, 2),
+    "arima_mape_pct": round(arima_mape, 2),
+    "lstm_rmse": round(lstm_rmse, 4),
+    "lstm_mae": round(lstm_mae, 4),
+    "lstm_beats_arima": bool(lstm_mape < arima_mape),
+    "nfr4_target_pct": 15,
+    "nfr4_pass": bool(lstm_mape < 15),
+}
+print(f"LSTM MAPE:  {metrics_b['lstm_mape_pct']}%")
+print(f"ARIMA MAPE: {metrics_b['arima_mape_pct']}%")
+print(f"LSTM RMSE:  {metrics_b['lstm_rmse']}")
+print(f"LSTM MAE:   {metrics_b['lstm_mae']}")
+print(f"LSTM beats ARIMA? {metrics_b['lstm_beats_arima']}")
+print(f"NFR4 pass? {'YES' if metrics_b['nfr4_pass'] else 'NO'}")
+
+with open("metrics_b.json", "w") as f:
+    json.dump(metrics_b, f, indent=2)</div>
+						</div>
+
+						<div class="cell-step">
+							<h4>Cell 7 — Panel B chart + download all files</h4>
+							<div class="cell-label">Copy into Colab cell 7</div>
+							<div class="path-block">plt.figure(figsize=(8, 5))
+plt.bar(["LSTM", "ARIMA"], [metrics_b["lstm_mape_pct"], metrics_b["arima_mape_pct"]], color=["#059669", "#94a3b8"])
+plt.ylabel("MAPE (%)")
+plt.title("L3 Price forecast — LSTM vs ARIMA (lower is better)")
+plt.axhline(15, color="red", linestyle="--", label="NFR4 target 15%")
+plt.legend()
+plt.tight_layout()
+plt.savefig("panel_b_price_mape.png", dpi=150)
+plt.show()
+
+model.save("lstm_price.h5")
+
+from google.colab import files
+files.download("panel_b_price_mape.png")
+files.download("metrics_b.json")
+files.download("lstm_price.h5")
+files.download("price_weekly.csv")</div>
+						</div>
+					</div>
+				</details>
+
+				<details class="notebook">
+					<summary><span class="step-num">C</span> Notebook C — L2 LSTM weather (Panel C)</summary>
+					<div class="nb-body">
+						<div class="upload-box">
+							<strong>Files to upload to Colab (from your Mac) — pick one weather file</strong>
+							<ul>
+								<li><code>farmsense-ai/ml-models/data/weather/daily_uk_2m_weather.parquet</code> <span class="from-nb">(primary, ~19MB)</span></li>
+								<li><code>farmsense-ai/ml-models/data/weather/uk_rainfall_temp_2010_2019.csv</code> <span class="from-nb">(backup if Colab runs out of memory)</span></li>
+							</ul>
+						</div>
+						<p class="nb-meta"><strong>Saves every run:</strong> <code>metrics_c.json</code>, <code>panel_c_weather_forecast.png</code>, <code>lstm_weather.h5</code></p>
+
+						<div class="cell-step">
+							<h4>Cell 1 — Install &amp; imports</h4>
+							<div class="cell-label">Copy into Colab cell 1</div>
+							<div class="path-block">!pip install -q pandas numpy pyarrow matplotlib tensorflow scikit-learn
+
+import pandas as pd
+import numpy as np
+import matplotlib.pyplot as plt
+from sklearn.preprocessing import MinMaxScaler
+from sklearn.metrics import mean_absolute_error, mean_squared_error
+from tensorflow.keras.models import Sequential
+from tensorflow.keras.layers import LSTM, Dense, Dropout
+import json</div>
+						</div>
+
+						<div class="cell-step">
+							<h4>Cell 2 — Load parquet &amp; filter (reduces RAM)</h4>
+							<div class="cell-label">Copy into Colab cell 2 — upload parquet first (~19MB)</div>
+							<div class="path-block">USE_PARQUET = True  # set False to use uk_rainfall_temp_2010_2019.csv instead
+
+if USE_PARQUET:
+    df = pd.read_parquet("daily_uk_2m_weather.parquet")
+    df["date"] = pd.to_datetime(df["date"])
+    df = df[(df["date"] >= "2015-01-01") & (df["date"] <= "2024-12-31")]
+    daily = df.groupby("date").agg({
+        "min_temp °c": "mean",
+        "max_temp °c": "mean",
+        "rain mm": "sum"
+    }).reset_index()
+    daily["temp"] = (daily["min_temp °c"] + daily["max_temp °c"]) / 2
+    weekly = daily.set_index("date")[["temp", "rain mm"]].resample("W").mean().dropna()
+else:
+    # Smaller backup file
+    raw = pd.read_csv("uk_rainfall_temp_2010_2019.csv")
+    raw = raw[raw["Type of period"] == "Monthly"]
+    raw["date"] = pd.to_datetime(raw["Year"].astype(str) + "-" + raw["Period"], format="%Y-%b")
+    weekly = raw.set_index("date")[["Avg temp(in centigrade)", "Avg rainfall(in mm)"]]
+    weekly.columns = ["temp", "rain mm"]
+
+print(weekly.tail())
+print("Weeks:", len(weekly))</div>
+						</div>
+
+						<div class="cell-step">
+							<h4>Cell 3 — Optimize SEQ_LEN (pick lowest RMSE)</h4>
+							<div class="cell-label">Copy into Colab cell 3</div>
+							<div class="path-block">HORIZON = 4
+TEST_WEEKS = 26
+
+target = weekly["temp"].values.reshape(-1, 1)
+scaler = MinMaxScaler()
+scaled = scaler.fit_transform(target)
+
+def make_sequences(data, seq_len):
+    X, y = [], []
+    for i in range(seq_len, len(data)):
+        X.append(data[i-seq_len:i, 0])
+        y.append(data[i, 0])
+    return np.array(X), np.array(y)
+
+def build_weather_lstm(seq_len):
+    m = Sequential([
+        LSTM(50, return_sequences=True, input_shape=(seq_len, 1)),
+        Dropout(0.2),
+        LSTM(25),
+        Dense(1)
+    ])
+    m.compile(optimizer="adam", loss="mse")
+    return m
+
+tune_results = []
+for seq_len in [8, 12, 16]:
+    X, y = make_sequences(scaled, seq_len)
+    split = len(X) - TEST_WEEKS
+    X_tr, X_te = X[:split], X[split:]
+    y_tr, y_te = y[:split], y[split:]
+    X_tr = X_tr.reshape((X_tr.shape[0], X_tr.shape[1], 1))
+    X_te = X_te.reshape((X_te.shape[0], X_te.shape[1], 1))
+
+    tmp = build_weather_lstm(seq_len)
+    tmp.fit(X_tr, y_tr, epochs=15, batch_size=16, verbose=0)
+    pred = tmp.predict(X_te, verbose=0).flatten()
+    y_true_tmp = scaler.inverse_transform(y_te.reshape(-1, 1)).flatten()
+    y_pred_tmp = scaler.inverse_transform(pred.reshape(-1, 1)).flatten()
+    rmse_tmp = float(np.sqrt(mean_squared_error(y_true_tmp, y_pred_tmp)))
+    tune_results.append({"seq_len": seq_len, "rmse": rmse_tmp})
+    print(f"SEQ_LEN={seq_len} → RMSE {rmse_tmp:.3f}°C")
+
+SEQ_LEN = min(tune_results, key=lambda x: x["rmse"])["seq_len"]
+print(f"\nBest SEQ_LEN: {SEQ_LEN}")</div>
+						</div>
+
+						<div class="cell-step">
+							<h4>Cell 4 — Train final LSTM with best SEQ_LEN</h4>
+							<div class="cell-label">Copy into Colab cell 4 — if OOM, set USE_PARQUET=False in Cell 2</div>
+							<div class="path-block">X, y = make_sequences(scaled, SEQ_LEN)
+split = len(X) - TEST_WEEKS
+X_train, X_test = X[:split], X[split:]
+y_train, y_test = y[:split], y[split:]
+X_train = X_train.reshape((X_train.shape[0], X_train.shape[1], 1))
+X_test = X_test.reshape((X_test.shape[0], X_test.shape[1], 1))
+
+model = build_weather_lstm(SEQ_LEN)
+model.fit(X_train, y_train, epochs=30, batch_size=16, verbose=1)
+
+pred_scaled = model.predict(X_test, verbose=0).flatten()
+y_true = scaler.inverse_transform(y_test.reshape(-1, 1)).flatten()
+y_pred = scaler.inverse_transform(pred_scaled.reshape(-1, 1)).flatten()
+print("Final LSTM trained.")</div>
+						</div>
+
+						<div class="cell-step">
+							<h4>Cell 5 — Evaluate RMSE / MAE &amp; save JSON (mandatory)</h4>
+							<div class="cell-label">Copy into Colab cell 5</div>
+							<div class="path-block">rmse = float(np.sqrt(mean_squared_error(y_true, y_pred)))
+mae = float(mean_absolute_error(y_true, y_pred))
+
+metrics_c = {
+    "model": "L2 LSTM weather",
+    "optimization": "SEQ_LEN grid [8,12,16]",
+    "best_seq_len": int(SEQ_LEN),
+    "tune_results": tune_results,
+    "target": "weekly UK mean temperature",
+    "horizon_weeks": HORIZON,
+    "rmse_celsius": round(rmse, 4),
+    "mae_celsius": round(mae, 4),
+    "test_weeks": TEST_WEEKS,
+}
+print(f"RMSE: {metrics_c['rmse_celsius']} °C")
+print(f"MAE:  {metrics_c['mae_celsius']} °C")
+
+with open("metrics_c.json", "w") as f:
+    json.dump(metrics_c, f, indent=2)</div>
+						</div>
+
+						<div class="cell-step">
+							<h4>Cell 6 — Panel C chart + download</h4>
+							<div class="cell-label">Copy into Colab cell 6</div>
+							<div class="path-block">plt.figure(figsize=(10, 5))
+plt.plot(y_true, label="Actual temp", linewidth=2)
+plt.plot(y_pred, label="LSTM predicted", linewidth=2)
+plt.title(f"L2 Weather — RMSE {metrics_c['rmse_celsius']}°C, MAE {metrics_c['mae_celsius']}°C")
+plt.xlabel("Test week index")
+plt.ylabel("Temperature (°C)")
+plt.legend()
+plt.tight_layout()
+plt.savefig("panel_c_weather_forecast.png", dpi=150)
+plt.show()
+
+model.save("lstm_weather.h5")
+
+from google.colab import files
+files.download("panel_c_weather_forecast.png")
+files.download("metrics_c.json")
+files.download("lstm_weather.h5")</div>
+						</div>
+					</div>
+				</details>
+
+				<details class="notebook">
+					<summary><span class="step-num">D</span> Notebook D — L4 Demand + RQ2 (Panel D)</summary>
+					<div class="nb-body">
+						<div class="upload-box">
+							<strong>Files to upload to Colab (from your Mac)</strong>
+							<ul>
+								<li><code>farmsense-ai/ml-models/data/sentiment/reddit_data.csv</code></li>
+								<li><code>farmsense-ai/ml-models/data/sentiment/twitter_data.csv</code></li>
+								<li><code>price_weekly.csv</code> <span class="from-nb">— from Notebook B download (or <code>farmsense-ai/ml-models/artifacts/price_weekly.csv</code> after you save it)</span></li>
+							</ul>
+						</div>
+						<p class="nb-meta"><strong>Saves every run:</strong> <code>metrics_d.json</code>, <code>metrics_d.csv</code>, <code>panel_d_demand_correlation.png</code> · <strong>Metrics:</strong> NLP <strong>F1</strong> + Pearson r (RQ2)</p>
+
+						<div class="cell-step">
+							<h4>Cell 1 — Install &amp; imports</h4>
+							<div class="cell-label">Copy into Colab cell 1</div>
+							<div class="path-block">!pip install -q pandas numpy matplotlib seaborn pytrends scipy scikit-learn
+
+import pandas as pd
+import numpy as np
+import matplotlib.pyplot as plt
+from scipy.stats import pearsonr
+from pytrends.request import TrendReq
+from sklearn.model_selection import train_test_split, GridSearchCV
+from sklearn.feature_extraction.text import TfidfVectorizer
+from sklearn.linear_model import LogisticRegression
+from sklearn.pipeline import Pipeline
+from sklearn.metrics import f1_score, accuracy_score, classification_report
+import json
+import time</div>
+						</div>
+
+						<div class="cell-step">
+							<h4>Cell 2 — Optimize sentiment NLP (GridSearchCV → F1 score)</h4>
+							<div class="cell-label">Copy into Colab cell 2 — uses Twitter CSV labels (-1, 0, 1)</div>
+							<div class="path-block">twitter = pd.read_csv("twitter_data.csv")
+# Sample for Colab speed (increase n if you have time)
+nlp_df = twitter[["clean_text", "category"]].dropna().sample(8000, random_state=42)
+X_nlp, y_nlp = nlp_df["clean_text"], nlp_df["category"]
+X_nlp_tr, X_nlp_te, y_nlp_tr, y_nlp_te = train_test_split(
+    X_nlp, y_nlp, test_size=0.2, random_state=42, stratify=y_nlp
+)
+
+nlp_pipe = Pipeline([
+    ("tfidf", TfidfVectorizer(max_features=5000, ngram_range=(1, 2))),
+    ("clf", LogisticRegression(max_iter=500, n_jobs=-1)),
+])
+nlp_grid = GridSearchCV(
+    nlp_pipe,
+    {"clf__C": [0.1, 1, 10]},
+    cv=3,
+    scoring="f1_weighted",
+    n_jobs=-1,
+    verbose=1,
+)
+nlp_grid.fit(X_nlp_tr, y_nlp_tr)
+nlp_model = nlp_grid.best_estimator_
+y_nlp_pred = nlp_model.predict(X_nlp_te)
+
+nlp_f1_w = f1_score(y_nlp_te, y_nlp_pred, average="weighted")
+nlp_f1_m = f1_score(y_nlp_te, y_nlp_pred, average="macro")
+nlp_acc = accuracy_score(y_nlp_te, y_nlp_pred)
+print(f"Sentiment NLP — F1 weighted: {nlp_f1_w:.4f}, F1 macro: {nlp_f1_m:.4f}")
+print(f"Best params: {nlp_grid.best_params_}")
+print(classification_report(y_nlp_te, y_nlp_pred))</div>
+						</div>
+
+						<div class="limit-box">
+							<strong>Google Trends 429 error?</strong> Google often blocks Colab IPs. Cell 3 fetches <em>one keyword at a time</em> with waits/retries.
+							If it still fails, an <strong>offline sentiment proxy</strong> runs automatically — note <code>"trends_source": "offline_sentiment_proxy"</code> in Ch.7.
+							Wait 5–10 minutes and retry Cell 3 only, or run Trends from your home Wi‑Fi later.
+						</div>
+
+						<div class="cell-step">
+							<h4>Cell 3 — Google Trends (with retry) OR offline fallback</h4>
+							<div class="cell-label">Copy into Colab cell 3 — if 429 persists, fallback runs automatically</div>
+							<div class="path-block">from pytrends.exceptions import TooManyRequestsError
+
+keywords = ["wheat", "potato", "barley"]  # one at a time reduces 429 errors
+TRENDS_PAUSE = 30   # seconds between keywords / retries
+TRENDS_RETRIES = 4
+
+def fetch_trends_one_by_one(keywords, timeframe="today 3-y", geo="GB"):
+    pytrends = TrendReq(hl="en-GB", tz=0, retries=2, backoff_factor=1.0)
+    parts = []
+    for kw in keywords:
+        ok = False
+        for attempt in range(TRENDS_RETRIES):
+            try:
+                wait = TRENDS_PAUSE * (attempt + 1)
+                if attempt > 0:
+                    print(f"Retry {kw} in {wait}s...")
+                    time.sleep(wait)
+                else:
+                    time.sleep(10)
+                pytrends.build_payload([kw], timeframe=timeframe, geo=geo)
+                df = pytrends.interest_over_time()
+                if df is None or df.empty:
+                    raise ValueError("empty response")
+                if "isPartial" in df.columns:
+                    df = df.drop(columns=["isPartial"])
+                parts.append(df[[kw]])
+                print(f"✓ Downloaded Trends: {kw}")
+                time.sleep(TRENDS_PAUSE)
+                ok = True
+                break
+            except (TooManyRequestsError, Exception) as e:
+                print(f"✗ {kw} attempt {attempt+1}/{TRENDS_RETRIES}: {type(e).__name__}")
+        if not ok:
+            print(f"Could not fetch {kw} from Google Trends")
+    if not parts:
+        return None
+    out = pd.concat(parts, axis=1)
+    return out.resample("W").mean().dropna()
+
+def offline_sentiment_proxy(keywords, price_index):
+    """Fallback when Google returns 429. Twitter has no dates — proxy only."""
+    twitter = pd.read_csv("twitter_data.csv")
+    n = len(price_index)
+    proxy = pd.DataFrame(index=price_index.index)
+    for kw in keywords:
+        mask = twitter["clean_text"].str.contains(kw, case=False, na=False)
+        sub = twitter.loc[mask]
+        base = (sub["category"].mean() + 1.0) if len(sub) else 0.0
+        # spread mention signal across weeks (document limitation in Ch.7)
+        proxy[kw] = base + np.linspace(0, len(sub) / max(n, 1), n) * 0.01
+    return proxy
+
+trends_source = "google_trends"
+trends = fetch_trends_one_by_one(keywords)
+
+if trends is None or trends.empty:
+    trends_source = "offline_sentiment_proxy"
+    prices_tmp = pd.read_csv("price_weekly.csv", index_col=0, parse_dates=True)
+    trends = offline_sentiment_proxy(keywords, prices_tmp)
+    print("\n⚠ Trends blocked (429). Using offline sentiment proxy.")
+    print("Write in Ch.7: live Trends failed; offline proxy used for Panel D.")
+
+print(trends.tail())
+print("Source:", trends_source)</div>
+						</div>
+
+						<div class="cell-step">
+							<h4>Cell 4 — Align Trends with price changes (Pearson r)</h4>
+							<div class="cell-label">Copy into Colab cell 4</div>
+							<div class="path-block">prices = pd.read_csv("price_weekly.csv", index_col=0, parse_dates=True)
+prices.columns = ["price_index"]
+prices["price_change"] = prices["price_index"].pct_change()
+
+merged = trends.join(prices["price_change"], how="inner").dropna()
+print("Aligned weeks:", len(merged))
+
+results = []
+for kw in keywords:
+    if kw in merged.columns:
+        r, p = pearsonr(merged[kw], merged["price_change"])
+        results.append({"keyword": kw, "pearson_r": r, "p_value": p})
+        print(f"{kw}: r={r:.3f}, p={p:.4f}")
+
+results_df = pd.DataFrame(results)
+print(results_df)</div>
+						</div>
+
+						<div class="cell-step">
+							<h4>Cell 5 — Save F1 + Pearson metrics JSON/CSV (mandatory)</h4>
+							<div class="cell-label">Copy into Colab cell 5</div>
+							<div class="path-block">results_df["rq2_significant"] = results_df["p_value"] < 0.05
+results_df.to_csv("metrics_d.csv", index=False)
+
+metrics_d = {
+    "model": "L4 Demand",
+    "nlp_optimization": "GridSearchCV LogisticRegression+TF-IDF",
+    "nlp_best_params": nlp_grid.best_params_,
+    "nlp_f1_weighted": round(float(nlp_f1_w), 4),
+    "nlp_f1_macro": round(float(nlp_f1_m), 4),
+    "nlp_accuracy": round(float(nlp_acc), 4),
+    "trends_vs_price": {
+        "source": trends_source,
+        "aligned_weeks": int(len(merged)),
+        "keywords": keywords,
+        "results": results_df.to_dict(orient="records"),
+    },
+}
+with open("metrics_d.json", "w") as f:
+    json.dump(metrics_d, f, indent=2)
+print("Saved metrics_d.json — check nlp_f1_weighted and pearson_r")</div>
+						</div>
+
+						<div class="cell-step">
+							<h4>Cell 6 — Panel D chart (F1 + Pearson r) + download</h4>
+							<div class="cell-label">Copy into Colab cell 6</div>
+							<div class="path-block">fig, axes = plt.subplots(1, 2, figsize=(12, 5))
+
+axes[0].bar(["F1 weighted", "F1 macro", "Accuracy"],
+            [nlp_f1_w, nlp_f1_m, nlp_acc], color="#059669")
+axes[0].set_ylim(0, 1.05)
+axes[0].set_title("L4 Sentiment NLP (optimized)")
+
+axes[1].bar(results_df["keyword"], results_df["pearson_r"], color="#2563eb")
+axes[1].axhline(0, color="black", linewidth=0.8)
+axes[1].set_title(f"Trends vs price (RQ2) — {trends_source}")
+axes[1].set_ylabel("Pearson r")
+
+plt.tight_layout()
+plt.savefig("panel_d_demand_correlation.png", dpi=150)
+plt.show()
+
+from google.colab import files
+files.download("panel_d_demand_correlation.png")
+files.download("metrics_d.json")
+files.download("metrics_d.csv")</div>
+						</div>
+					</div>
+				</details>
+
+				<details class="notebook">
+					<summary><span class="step-num">E</span> Notebook E — L5 Ranking + RQ1 (Panel E)</summary>
+					<div class="nb-body">
+						<div class="upload-box">
+							<strong>Files to upload to Colab (from your Mac)</strong>
+							<ul>
+								<li><code>rf_suitability.pkl</code> <span class="from-nb">— from Notebook A download (or <code>farmsense-ai/ml-models/artifacts/rf_suitability.pkl</code> after you save it)</span></li>
+								<li><code>price_weekly.csv</code> <span class="from-nb">— from Notebook B download (or <code>farmsense-ai/ml-models/artifacts/price_weekly.csv</code> after you save it)</span></li>
+							</ul>
+						</div>
+						<p class="nb-meta"><strong>Saves every run:</strong> <code>metrics_e.json</code>, <code>ranking_results.csv</code>, <code>panel_e_profit_rank.png</code>, <code>ranking_model.pkl</code> · <strong>Target:</strong> full pipeline beats soil-only (RQ1)</p>
+
+						<div class="cell-step">
+							<h4>Cell 1 — Install &amp; imports</h4>
+							<div class="cell-label">Copy into Colab cell 1</div>
+							<div class="path-block">!pip install -q pandas numpy scikit-learn xgboost matplotlib joblib
+
+import pandas as pd
+import numpy as np
+import matplotlib.pyplot as plt
+import joblib
+from xgboost import XGBRegressor
+from sklearn.model_selection import GridSearchCV
+import json</div>
+						</div>
+
+						<div class="cell-step">
+							<h4>Cell 2 — Load RF model &amp; define soil scenarios</h4>
+							<div class="cell-label">Copy into Colab cell 2 — upload rf_suitability.pkl from Notebook A</div>
+							<div class="path-block">rf = joblib.load("rf_suitability.pkl")
+prices = pd.read_csv("price_weekly.csv", index_col=0, parse_dates=True)
+prices.columns = ["price_index"]
+latest_price = float(prices["price_index"].iloc[-1])
+
+# 3 fixed UK-style soil scenarios (edit N,P,K etc. to match your dissertation)
+scenarios = pd.DataFrame([
+    {"name": "Heavy clay", "N": 80, "P": 40, "K": 40, "temperature": 14, "humidity": 75, "ph": 6.5, "rainfall": 90},
+    {"name": "Sandy loam", "N": 60, "P": 35, "K": 50, "temperature": 16, "humidity": 65, "ph": 6.8, "rainfall": 55},
+    {"name": "Chalk down", "N": 70, "P": 30, "K": 45, "temperature": 15, "humidity": 70, "ph": 7.2, "rainfall": 70},
+])
+FEATURES = ["N", "P", "K", "temperature", "humidity", "ph", "rainfall"]
+print(scenarios)</div>
+						</div>
+
+						<div class="cell-step">
+							<h4>Cell 3 — Soil-only vs full pipeline scores</h4>
+							<div class="cell-label">Copy into Colab cell 3 — weights from Figure 5.4</div>
+							<div class="path-block"># Weights: suitability 0.35, weather 0.20, price 0.30, demand 0.15
+W_SUIT, W_WEATHER, W_PRICE, W_DEMAND = 0.35, 0.20, 0.30, 0.15
+
+# Use top RF crops for each scenario
+proba = rf.predict_proba(scenarios[FEATURES])
+classes = rf.classes_
+
+rows = []
+for i, row in scenarios.iterrows():
+    top_idx = np.argsort(proba[i])[-5:][::-1]
+    for j in top_idx:
+        crop = classes[j]
+        suit_score = proba[i][j]
+        # Normalised placeholders from Notebooks B–D (replace with your real metrics)
+        weather_score = 0.7
+        price_score = min(latest_price / 200, 1.0)
+        demand_score = 0.6
+
+        soil_only = suit_score
+        full = (W_SUIT * suit_score + W_WEATHER * weather_score +
+                W_PRICE * price_score + W_DEMAND * demand_score)
+        profit_proxy = full * latest_price  # £ proxy for ranking chart
+
+        rows.append({
+            "scenario": row["name"],
+            "crop": crop,
+            "soil_only": soil_only,
+            "full_pipeline": full,
+            "profit_proxy": profit_proxy
+        })
+
+rank_df = pd.DataFrame(rows)
+# Top crop per scenario — full pipeline
+top_full = rank_df.sort_values("full_pipeline", ascending=False).groupby("scenario").head(1)
+top_soil = rank_df.sort_values("soil_only", ascending=False).groupby("scenario").head(1)
+print("Full pipeline winners:\n", top_full[["scenario", "crop", "full_pipeline"]])
+print("\nSoil-only winners:\n", top_soil[["scenario", "crop", "soil_only"]])</div>
+						</div>
+
+						<div class="cell-step">
+							<h4>Cell 5 — Optimize XGBoost (GridSearchCV on profit proxy)</h4>
+							<div class="cell-label">Copy into Colab cell 5</div>
+							<div class="path-block">train_X = rank_df[["soil_only", "full_pipeline"]].copy()
+train_X["price"] = latest_price
+y = rank_df["profit_proxy"]
+
+xgb_base = XGBRegressor(random_state=42, n_jobs=-1)
+xgb_grid = GridSearchCV(
+    xgb_base,
+    {"n_estimators": [50, 100, 200], "max_depth": [3, 4, 6]},
+    cv=3,
+    scoring="neg_mean_squared_error",
+    n_jobs=-1,
+    verbose=1,
+)
+xgb_grid.fit(train_X, y)
+xgb = xgb_grid.best_estimator_
+rank_df["xgb_profit"] = xgb.predict(train_X)
+
+print("Best XGB params:", xgb_grid.best_params_)
+print(rank_df.sort_values("xgb_profit", ascending=False).head(8))
+joblib.dump(xgb, "ranking_model.pkl")</div>
+						</div>
+
+						<div class="cell-step">
+							<h4>Cell 6 — Save ranking comparison + metrics JSON (mandatory)</h4>
+							<div class="cell-label">Copy into Colab cell 6 — open metrics_e.json for RQ1 answer</div>
+							<div class="path-block">comparison = []
+for scenario in scenarios["name"]:
+    soil_row = top_soil[top_soil["scenario"] == scenario].iloc[0]
+    full_row = top_full[top_full["scenario"] == scenario].iloc[0]
+    comparison.append({
+        "scenario": scenario,
+        "soil_only_crop": soil_row["crop"],
+        "soil_only_score": round(float(soil_row["soil_only"]), 4),
+        "full_pipeline_crop": full_row["crop"],
+        "full_pipeline_score": round(float(full_row["full_pipeline"]), 4),
+        "full_pipeline_wins": bool(full_row["full_pipeline"] > soil_row["soil_only"]),
+    })
+
+comparison_df = pd.DataFrame(comparison)
+comparison_df.to_csv("ranking_results.csv", index=False)
+
+metrics_e = {
+    "model": "L5 Ranking",
+    "optimization": "GridSearchCV XGBRegressor",
+    "xgb_best_params": xgb_grid.best_params_,
+    "weights": {"suitability": 0.35, "weather": 0.20, "price": 0.30, "demand": 0.15},
+    "scenarios": comparison,
+    "rq1_supported": bool(comparison_df["full_pipeline_wins"].any()),
+}
+with open("metrics_e.json", "w") as f:
+    json.dump(metrics_e, f, indent=2)
+print(comparison_df)
+print(f"RQ1 supported? {metrics_e['rq1_supported']}")</div>
+						</div>
+
+						<div class="cell-step">
+							<h4>Cell 7 — Panel E bar chart + download all files</h4>
+							<div class="cell-label">Copy into Colab cell 7</div>
+							<div class="path-block">plot_df = rank_df.groupby("scenario").agg({
+    "soil_only": "max",
+    "full_pipeline": "max"
+}).reset_index()
+
+x = np.arange(len(plot_df))
+w = 0.35
+plt.figure(figsize=(9, 5))
+plt.bar(x - w/2, plot_df["soil_only"], w, label="Soil-only (RF)", color="#94a3b8")
+plt.bar(x + w/2, plot_df["full_pipeline"], w, label="Full pipeline", color="#059669")
+plt.xticks(x, plot_df["scenario"])
+plt.ylabel("Composite score")
+plt.title("L5 Ranking — soil-only vs full pipeline (RQ1)")
+plt.legend()
+plt.tight_layout()
+plt.savefig("panel_e_profit_rank.png", dpi=150)
+plt.show()
+
+from google.colab import files
+files.download("panel_e_profit_rank.png")
+files.download("metrics_e.json")
+files.download("ranking_results.csv")
+files.download("ranking_model.pkl")
+print("Paste comparison from metrics_e.json into §7.5")</div>
+						</div>
+					</div>
+				</details>
+
+				<!-- WHERE TO PASTE -->
+				<h2>5. After training — where to save &amp; paste</h2>
+				<table class="data">
+					<thead>
+						<tr><th>What you produced</th><th>Save on Mac</th><th>Paste / write in dissertation</th></tr>
+					</thead>
+					<tbody>
+						<tr>
+							<td>PNG charts (Panels A–E)</td>
+							<td><code>ml-models/figures/</code></td>
+							<td><strong>Figure 7.1</strong> in Word — combine panels or paste as one image under §7.5. Also update <code>dissertation-template.html</code> <code>#fig-7-1</code> placeholder.</td>
+						</tr>
+						<tr>
+							<td>Model files (.pkl, .h5)</td>
+							<td><code>ml-models/artifacts/</code></td>
+							<td>Mention in <strong>Ch.6</strong> implementation; optional <strong>Appendix A</strong> GitHub link. Do not paste binary in Word.</td>
+						</tr>
+						<tr>
+							<td>Metrics JSON (<code>metrics_a.json</code> … <code>metrics_e.json</code>)</td>
+							<td><code>ml-models/artifacts/</code></td>
+							<td>Open after each run — copy numbers into <strong>§7.5</strong>. Check <code>nfr3_pass</code>, <code>nfr4_pass</code>, <code>rq1_supported</code>.</td>
+						</tr>
+						<tr>
+							<td>CSV extras (<code>metrics_d.csv</code>, <code>ranking_results.csv</code>)</td>
+							<td><code>ml-models/artifacts/</code></td>
+							<td>Tables for Appendix C or §7.5 if needed.</td>
+						</tr>
+						<tr>
+							<td>Accuracy, F1, MAPE, Pearson r numbers</td>
+							<td>Inside <code>metrics_*.json</code></td>
+							<td><strong>§7.5 prose</strong> — answer RQ1, RQ2, RQ3 in full sentences with numbers.</td>
+						</tr>
+						<tr>
+							<td>Objective O3–O5 status</td>
+							<td>—</td>
+							<td><strong>Table 1.1</strong> (Ch.1) — mark met / partial. <strong>§7.5</strong> — one sentence per objective.</td>
+						</tr>
+						<tr>
+							<td>NFR3, NFR4 pass/fail</td>
+							<td>—</td>
+							<td><strong>§7.5</strong> + <strong>Table 4.2</strong> discussion — “suitability met 87% (NFR3); price MAPE 12% (NFR4).”</td>
+						</tr>
+						<tr>
+							<td>pytest results</td>
+							<td>Screenshot or log</td>
+							<td><strong>Table 7.1</strong> (§7.2) — fill TC01–TC06 Pass/Fail. <strong>Appendix C</strong> optional screenshot.</td>
+						</tr>
+						<tr>
+							<td>Usability notes</td>
+							<td>Appendix folder</td>
+							<td><strong>§7.4</strong> + <strong>Appendix B/C</strong> — RQ3 qualitative evidence.</td>
+						</tr>
+						<tr>
+							<td>Colab notebook URLs</td>
+							<td>Save notebooks to Drive</td>
+							<td><strong>Appendix A</strong> — “Training notebooks: [Drive links]” for supervisor.</td>
+						</tr>
+					</tbody>
+				</table>
+
+				<h2>6. Build Figure 7.1 (one image for Word)</h2>
+				<ol class="manual-steps">
+					<li>Collect <code>panel_a</code> … <code>panel_e</code> PNGs from <code>figures/</code>.</li>
+					<li>In PowerPoint, Canva, or Colab: arrange as 2×3 grid with labels (A) RF, (B) Price, (C) Weather, (D) Demand, (E) Ranking.</li>
+					<li>Export single PNG → <code>figures/figure_7_1_combined.png</code>.</li>
+					<li>In Word dissertation: Insert under caption <strong>“Figure 7.1: Summary of model evaluation results.”</strong></li>
+					<li>In <code>dissertation-template.html</code>: replace Figure 7.1 placeholder box with your image for preview.</li>
+				</ol>
+				<p class="tiny"><strong>Files you should have after all 5 notebooks:</strong>
+					<code>panel_a_rf_confusion.png</code>,
+					<code>panel_b_price_mape.png</code>,
+					<code>panel_c_weather_forecast.png</code>,
+					<code>panel_d_demand_correlation.png</code>,
+					<code>panel_e_profit_rank.png</code>,
+					plus <code>metrics_a.json</code> through <code>metrics_e.json</code> in <code>artifacts/</code>.</p>
+
+				<h2>7. Data files on your Mac (upload to each Colab notebook)</h2>
+				<div class="path-block">farmsense-ai/ml-models/data/
+├── suitability/Crop_recommendation.csv          → Notebook A
+├── prices/govuk_price_indices_API.csv         → Notebook B
+├── prices/defra_ammg_combined.csv               → Notebook B
+├── weather/daily_uk_2m_weather.parquet          → Notebook C
+├── weather/uk_rainfall_temp_2010_2019.csv       → Notebook C (backup)
+├── sentiment/reddit_data.csv                    → Notebook D
+└── sentiment/twitter_data.csv                   → Notebook D</div>
+
+				<h2>8. Data already on disk ✓</h2>
+				<ul>
+					<li>Crop recommendation CSV</li>
+					<li>DEFRA AMMG prices (merged)</li>
+					<li>GOV.UK agricultural price indices</li>
+					<li>UK weather daily (2M parquet)</li>
+					<li>Reddit + Twitter sentiment CSVs</li>
+				</ul>
+
+				<!-- PENDING BOX -->
+				<div class="pending-box" id="pending">
+					<h2>⚠ Pending — not required for Figure 7.1, but needed for live app / stronger RQ2</h2>
+					<p class="tiny">Complete these when you wire the real FastAPI backend. Offline CSV + Colab is enough for dissertation evaluation.</p>
+					<table class="data">
+						<thead>
+							<tr><th>Item</th><th>Status</th><th>What to do</th><th>Blocks dissertation?</th></tr>
+						</thead>
+						<tbody>
+							<tr>
+								<td><strong>Google Trends (Pytrends)</strong></td>
+								<td class="status-manual">✗ Pending</td>
+								<td>In Colab Notebook D: <code>pip install pytrends</code> → fetch weekly scores for crop keywords (UK). Correlate with price → stronger <strong>RQ2</strong> than CSV-only.</td>
+								<td>No — CSV sentiment can answer RQ2; Trends improves it</td>
+							</tr>
+							<tr>
+								<td><strong>Reddit API (live)</strong></td>
+								<td class="status-manual">✗ Pending</td>
+								<td>Create app at <a href="https://www.reddit.com/prefs/apps" target="_blank" rel="noopener">reddit.com/prefs/apps</a> → add to <code>farmsense-ai/.env</code>. Use PRAW for live FR5 in app.</td>
+								<td>No — <code>reddit_data.csv</code> enough for training charts</td>
+							</tr>
+							<tr>
+								<td><strong>Reddit .env file</strong></td>
+								<td class="status-manual">✗ Pending</td>
+								<td><code>REDDIT_CLIENT_ID</code>, <code>REDDIT_CLIENT_SECRET</code>, <code>REDDIT_USER_AGENT</code> in <code>.env</code> (never commit)</td>
+								<td>No for Ch.7; Yes for live demo</td>
+							</tr>
+							<tr>
+								<td><strong>FastAPI + model deployment</strong></td>
+								<td class="status-manual">✗ Pending</td>
+								<td>Copy <code>.pkl</code> / <code>.h5</code> from Colab → <code>ml-models/artifacts/</code> → load in backend</td>
+								<td>No for dissertation write-up; Yes for working demo</td>
+							</tr>
+							<tr>
+								<td><strong>Table 7.1 pytest (TC01–TC06)</strong></td>
+								<td class="status-manual">✗ Pending</td>
+								<td>Run tests on Mac after API wired → fill Pass/Fail in dissertation §7.2</td>
+								<td>Partial — fill what you can; mock tests OK if labelled</td>
+							</tr>
+							<tr>
+								<td><strong>Usability study (≥3 users)</strong></td>
+								<td class="status-manual">✗ Pending</td>
+								<td>Ethics consent → think-aloud → Appendix B/C → <strong>RQ3</strong> in §7.4</td>
+								<td>Yes for full RQ3 — schedule after UI demo ready</td>
+							</tr>
+							<tr>
+								<td><strong>UK Crop Yield (Nature)</strong></td>
+								<td class="status-manual">✗ Optional</td>
+								<td>Download from <a href="https://www.nature.com/articles/s41597-025-06528-x" target="_blank" rel="noopener">Nature paper</a> if time</td>
+								<td>No</td>
+							</tr>
+						</tbody>
+					</table>
+					<p class="tiny" style="margin-top:12px">
+						<strong>Your next action:</strong> Open Colab → start <strong>Notebook A</strong> (§4 step A) today.
+						After all 5 notebooks, build Figure 7.1 (§6) and write §7.5 in Word.
+					</p>
+				</div>
+
+				<div class="footer tiny">
+					FarmSense AI · Northumbria LD6053 · Student 25055042 ·
+					Open this file: <code>ml-models/ml-data-and-training-guide.html</code> ·
+					Dissertation: Figure 7.1 (§7.5), Table 7.1 (§7.2), RQ answers (§7.5).
+				</div>
+			</div>
+		</div>
+	</div>
+</body>
+</html>

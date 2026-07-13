@@ -1,0 +1,4 @@
+scenario,soil_only_crop,soil_only_score,full_pipeline_crop,full_pipeline_score,full_pipeline_wins
+Heavy clay,maize,0.6,maize,0.5988,False
+Sandy loam,maize,0.355,maize,0.513,True
+Chalk down,maize,0.46,maize,0.5498,True

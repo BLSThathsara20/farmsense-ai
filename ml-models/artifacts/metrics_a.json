@@ -1,0 +1,11 @@
+{
+  "model": "L1 Random Forest",
+  "accuracy": 0.975,
+  "accuracy_pct": 97.5,
+  "f1_weighted": 0.9747,
+  "f1_macro": 0.9747,
+  "precision_weighted": 0.9776,
+  "recall_weighted": 0.975,
+  "nfr3_target": 0.85,
+  "nfr3_pass": true
+}

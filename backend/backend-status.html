@@ -1,0 +1,137 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+	<meta charset="UTF-8">
+	<meta name="viewport" content="width=device-width, initial-scale=1.0">
+	<title>FarmSense AI — Backend Architecture &amp; Status</title>
+	<style>
+		:root {
+			--paper: #fff; --ink: #0f172a; --muted: #475569; --border: #e2e8f0;
+			--accent: #059669; --accent-soft: #ecfdf5; --warn: #b45309; --soft: #f8fafc;
+			--mono: ui-monospace, Menlo, Monaco, Consolas, monospace;
+			--sans: system-ui, -apple-system, Segoe UI, Roboto, sans-serif;
+		}
+		body { margin: 0; background: linear-gradient(180deg, #0b1220, #020617); font-family: var(--sans); color: #fff; }
+		.shell { max-width: 1080px; margin: 0 auto; padding: 28px 16px 48px; }
+		.brand { font-weight: 700; font-size: 18px; margin-bottom: 12px; }
+		.paper { background: var(--paper); color: var(--ink); border-radius: 16px; padding: 28px 32px 40px; box-shadow: 0 24px 60px rgba(0,0,0,.35); }
+		h1 { margin: 0 0 8px; font-size: 26px; }
+		h2 { margin: 28px 0 10px; font-size: 18px; border-bottom: 2px solid var(--accent); padding-bottom: 6px; }
+		p, li, td { font-size: 14px; line-height: 1.55; }
+		.lead { color: var(--muted); }
+		table { width: 100%; border-collapse: collapse; font-size: 13px; margin: 12px 0; }
+		th, td { border: 1px solid var(--border); padding: 8px 10px; text-align: left; vertical-align: top; }
+		th { background: var(--soft); }
+		code { font-family: var(--mono); font-size: 12px; background: var(--soft); padding: 2px 6px; border-radius: 4px; }
+		pre { background: #0f172a; color: #e2e8f0; padding: 14px; border-radius: 10px; overflow-x: auto; font-size: 12px; }
+		.callout { background: var(--accent-soft); border-left: 4px solid var(--accent); padding: 12px 14px; border-radius: 0 10px 10px 0; margin: 14px 0; }
+		.tag { font-size: 11px; font-weight: 700; padding: 2px 8px; border-radius: 999px; background: #dcfce7; color: #166534; }
+		.grid { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; }
+		@media (max-width: 720px) { .grid { grid-template-columns: 1fr; } }
+		.card { border: 1px solid var(--border); border-radius: 12px; padding: 14px; background: var(--soft); }
+	</style>
+</head>
+<body>
+	<div class="shell">
+		<div class="brand">FarmSense AI — Backend live reference</div>
+		<div class="paper">
+			<h1>Backend architecture &amp; performance</h1>
+			<p class="lead">Layered FastAPI service connected to PostgreSQL 16, React frontend, and ML artefacts. Optimised for fast JSON responses, safe retries, and future scale.</p>
+
+			<h2>Architecture layers</h2>
+			<pre>React (Vite) ──JWT──► API routers (thin)
+                           │
+                     Services (business logic)
+                           │
+              Repositories / SQLAlchemy models
+                           │
+                     PostgreSQL 16
+                           │
+              ML loader (singleton RF at startup)</pre>
+
+			<table>
+				<tr><th>Folder</th><th>Responsibility</th></tr>
+				<tr><td><code>app/api</code> (in <code>main.py</code> router)</td><td>HTTP routes, status codes, rate limits</td></tr>
+				<tr><td><code>app/services/</code></td><td>Auth, soil, recommendations, seed data</td></tr>
+				<tr><td><code>app/db/models.py</code></td><td>ORM entities matching <code>database/init.sql</code></td></tr>
+				<tr><td><code>app/core/</code></td><td>Config, JWT, middleware, idempotency, errors</td></tr>
+				<tr><td><code>app/ml/loader.py</code></td><td>Load RF once; predict on request</td></tr>
+			</table>
+
+			<h2>Performance techniques (production patterns)</h2>
+			<div class="grid">
+				<div class="card"><strong>ORJSON responses</strong><p>FastAPI default response class — faster JSON serialisation than stdlib.</p></div>
+				<div class="card"><strong>ML singleton</strong><p>Random Forest loaded at startup — no disk I/O per request.</p></div>
+				<div class="card"><strong>Connection pool</strong><p>SQLAlchemy <code>pool_pre_ping</code>, size 10, overflow 20.</p></div>
+				<div class="card"><strong>TTL response cache</strong><p>GET <code>/dashboard</code>, <code>/market</code>, <code>/community</code> cached 60s in-process.</p></div>
+				<div class="card"><strong>GZip middleware</strong><p>Compresses responses &gt;500 bytes.</p></div>
+				<div class="card"><strong><code>X-Response-Time-Ms</code></strong><p>Every response includes server timing for profiling.</p></div>
+			</div>
+			<p class="callout"><strong>Future upgrades:</strong> Redis for distributed cache + idempotency; <code>--workers N</code> behind nginx; read replicas for market snapshots; async SQLAlchemy + asyncpg under load.</p>
+
+			<h2>Security</h2>
+			<ul>
+				<li>JWT Bearer tokens (HS256) — frontend stores token in Zustand persist</li>
+				<li>Bcrypt password hashing via Passlib</li>
+				<li>CORS restricted to Vite dev origins</li>
+				<li>Rate limiting via SlowAPI (120/min default)</li>
+				<li>Security headers: <code>X-Content-Type-Options</code>, <code>X-Frame-Options</code>, <code>Referrer-Policy</code></li>
+				<li>Structured error JSON — no stack traces to clients</li>
+				<li>District aggregates store counts only (NFR2)</li>
+			</ul>
+
+			<h2>Idempotency (safe POST retries)</h2>
+			<p>Send header <code>Idempotency-Key: &lt;uuid&gt;</code> on <code>POST /soil</code>. Same key + same body replays stored response; mismatched body returns 409. Table: <code>idempotency_record</code>.</p>
+
+			<h2>API endpoints</h2>
+			<table>
+				<tr><th>Method</th><th>Path</th><th>Auth</th><th>Notes</th></tr>
+				<tr><td>GET</td><td><code>/health</code></td><td>No</td><td>Liveness — Table 7.1 TC02</td></tr>
+				<tr><td>GET</td><td><code>/health/ready</code></td><td>No</td><td>DB + ML readiness</td></tr>
+				<tr><td>POST</td><td><code>/auth/register</code></td><td>No</td><td>Creates user + farm profile</td></tr>
+				<tr><td>POST</td><td><code>/auth/login</code></td><td>No</td><td>Returns JWT</td></tr>
+				<tr><td>POST</td><td><code>/soil</code></td><td>Yes</td><td>Soil reading + ML run; idempotent</td></tr>
+				<tr><td>GET</td><td><code>/recommendations</code></td><td>Yes</td><td>Latest ranked crops</td></tr>
+				<tr><td>GET</td><td><code>/dashboard</code></td><td>Yes</td><td>Cached dashboard bundle</td></tr>
+				<tr><td>GET</td><td><code>/market?crop=</code></td><td>No</td><td>Price series (cached)</td></tr>
+				<tr><td>GET</td><td><code>/market/crops</code></td><td>No</td><td>Crop list</td></tr>
+				<tr><td>GET</td><td><code>/community</code></td><td>Yes</td><td>District aggregates</td></tr>
+				<tr><td>POST</td><td><code>/predict/suitability</code></td><td>No</td><td>Legacy ML — pytest TC01</td></tr>
+			</table>
+
+			<h2>Run locally</h2>
+			<pre>cd farmsense-ai
+docker compose up -d --build
+
+# Backend (without Docker)
+cd backend && cp .env.example .env
+python3 -m venv .venv && .venv/bin/pip install -r requirements.txt
+.venv/bin/uvicorn app.main:app --reload --port 8000
+
+# Frontend (live API)
+cd frontend && cp .env.example .env
+npm run dev
+
+# Tests
+cd backend && .venv/bin/pytest tests/ -v</pre>
+
+			<h2>Error format</h2>
+			<pre>{
+  "error": {
+    "code": "unauthorized",
+    "message": "Missing or invalid authorization header",
+    "request_id": "uuid"
+  }
+}</pre>
+
+			<h2>Related docs</h2>
+			<ul>
+				<li><code>database/database-design-plan.html</code> — ER model &amp; SQL</li>
+				<li><code>ml-models/ml-data-and-training-guide.html</code> — training</li>
+				<li>Dissertation §5.1–5.2, §6.2.3, Table 7.1</li>
+			</ul>
+			<p><span class="tag">Updated</span> Architecture v1.0 — PostgreSQL + FastAPI + JWT + idempotency + ORJSON + pooled DB.</p>
+		</div>
+	</div>
+</body>
+</html>

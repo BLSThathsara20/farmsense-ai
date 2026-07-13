@@ -1,0 +1,4 @@
+keyword,pearson_r,p_value,rq2_significant
+wheat,0.00257520900488469,0.9753044257801639,False
+potato,0.002575209004883257,0.975304425780179,False
+barley,,,False

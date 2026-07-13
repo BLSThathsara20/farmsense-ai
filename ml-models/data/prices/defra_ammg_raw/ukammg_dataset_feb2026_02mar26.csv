@@ -1,0 +1,58 @@
+﻿sector,item,geography,value,units,data_frequency,wchange,mchange,qchange,yrchange,fiveyrchange,data_date
+arable,bread_milling_wheat,United Kingdom,181,£/t,weekly,3.00%,2.10%,NA,-16%,NA,22/02/2026
+arable,feed_barley,United Kingdom,154,£/t,weekly,-0.42%,-1.50%,NA,-6.20%,NA,22/02/2026
+arable,feed_wheat,United Kingdom,167,£/t,weekly,0.09%,-0.20%,NA,-10%,NA,22/02/2026
+arable,ni_potato_processing,Northern Ireland,178,£/t,monthly,NA,-24%,NA,-32%,NA,Dec-25
+arable,ni_potato_washing,Northern Ireland,292,£/t,monthly,NA,2.10%,NA,-1.90%,NA,Dec-25
+arable,oilseed_rape,England,419,£/t,monthly,NA,3.50%,NA,-1.00%,NA,Feb-26
+arable,premium_malting_barley,United Kingdom,167,£/t,weekly,NA,4.10%,NA,-2.60%,NA,14/12/2025
+beef,monthly_cows_deadweight_gb,Great Britain,503,p/kg,monthly,NA,1.80%,NA,22%,55%,Jan-26
+beef,monthly_prime_cattle_deadweight_gb,Great Britain,642,p/kg,monthly,NA,-1.30%,NA,11%,39%,Jan-26
+beef,weekly_average_beef_veal_production,United Kingdom,17,Tonnes (th),monthly (weekly average),NA,4.60%,NA,-0.85%,-0.28%,Jan-26
+beef,weekly_average_prime_cattle_slaughter,United Kingdom,37,Head (th),monthly (weekly average),NA,3.40%,NA,-3.70%,-2.10%,Jan-26
+beef,weekly_cows_deadweight_gb,Great Britain,512,p/kg,weekly,0.35%,NA,NA,NA,NA,14/02/2026
+beef,weekly_prime_cattle_deadweight_gb,Great Britain,636,p/kg,weekly,0.20%,NA,NA,NA,NA,14/02/2026
+dairy,ampe,United Kingdom,33,p/l,monthly,NA,9.00%,NA,-26%,NA,Feb-26
+dairy,bulk_cream,United Kingdom,1185,£/t,monthly,NA,-9.70%,NA,-55%,-39%,Jan-26
+dairy,mcve,United Kingdom,33,p/l,monthly,NA,2.90%,NA,-27%,NA,Feb-26
+dairy,uk_daily_milk_deliveries_7_day_rolling_average,United Kingdom,43,Litres (m),daily,NA,NA,NA,3.90%,NA,02/02/2026
+dairy,uk_fg_milk_price,United Kingdom,38,p/l,monthly,NA,-5.20%,NA,-18%,-5.20%,Jan-26
+dairy,weekly_average_uk_volume,United Kingdom,300,Litres (m),monthly,NA,-0.93%,NA,4.10%,6.30%,Jan-26
+eggs,barn_prod,United Kingdom,22,m doz,quarterly,NA,NA,-0.56%,28%,NA,Q4 2025
+eggs,enriched_price,United Kingdom,99,p/dozen,quarterly,NA,NA,-4.20%,0.79%,NA,Q4 2025
+eggs,enriched_prod,United Kingdom,44,m doz,quarterly,NA,NA,-6.50%,-16%,NA,Q4 2025
+eggs,free_range_price,United Kingdom,159,p/dozen,quarterly,NA,NA,0.11%,-0.67%,NA,Q4 2025
+eggs,free_range_prod,United Kingdom,197,m doz,quarterly,NA,NA,4.20%,12%,NA,Q4 2025
+eggs,organic_prod,United Kingdom,9.7,m doz,quarterly,NA,NA,-4.50%,5.10%,NA,Q4 2025
+eggs,total_price,United Kingdom,149,p/dozen,quarterly,NA,NA,0.26%,1.20%,NA,Q4 2025
+eggs,total_prod,United Kingdom,273,m doz,quarterly,NA,NA,1.60%,7.00%,NA,Q4 2025
+eggs,weekly_average_commercial_layers_chicks_placed,United Kingdom,0.77,Chicks (m),monthly,NA,4.40%,NA,-5.40%,6.20%,Jan-26
+eggs,weekly_average_commercial_layers_eggs_set,United Kingdom,2.3,Eggs (m),monthly,NA,29%,NA,9.90%,15%,Jan-26
+hort_winter,apple,England,1.2,£/kg,monthly,NA,-2.30%,NA,-7.00%,NA,Feb-26
+hort_winter,brussels_sprouts,England,1.1,£/kg,monthly,NA,-2.30%,NA,-8.10%,NA,Feb-26
+hort_winter,cabbage_white,England,0.53,£/kg,monthly,NA,4.60%,NA,4.60%,NA,Feb-26
+hort_winter,carrot,England,0.56,£/kg,monthly,NA,11%,NA,22%,NA,Feb-26
+hort_winter,cauliflower,England,0.88,£/head,monthly,NA,-19%,NA,-12%,NA,Feb-26
+hort_winter,onion,England,0.64,£/kg,monthly,NA,6.90%,NA,8.60%,NA,Feb-26
+hort_winter,swede,England,0.25,£/kg,monthly,NA,0.30%,NA,-16%,NA,Feb-26
+pigs,monthly_spp_deadweight_gb,Great Britain,192,p/kg,monthly,NA,-2.90%,NA,-6.00%,6.60%,Jan-26
+pigs,weekly_average_clean_pig_slaughter,United Kingdom,197,Head (th),monthly (weekly average),NA,-0.08%,NA,-3.10%,-0.31%,Jan-26
+pigs,weekly_average_pigmeat_production,United Kingdom,19,Tonnes (th),monthly (weekly average),NA,3.50%,NA,0.13%,3.50%,Jan-26
+pigs,weekly_spp_deadweight_gb,Great Britain,187,p/kg,weekly,-0.79%,NA,NA,NA,NA,21/02/2026
+poultry,boiling_fowl_slaughter_weekly_average,United Kingdom,0.59,Birds (m),monthly,NA,4.60%,NA,0.55%,-20%,Jan-26
+poultry,broiler_breeders_eggs_set_weekly_average,United Kingdom,1.2,Eggs (m),monthly,NA,-8.80%,NA,-15%,-3.20%,Jan-26
+poultry,broiler_slaughter_weekly_average,United Kingdom,22,Birds (m),monthly,NA,3.60%,NA,-2.60%,2.80%,Jan-26
+poultry,commercial_broilers_chicks_placed_weekly_average,United Kingdom,23,Chicks (m),monthly,NA,0.96%,NA,0.06%,0.99%,Jan-26
+poultry,commercial_broilers_eggs_set_weekly_average,United Kingdom,27,Eggs (m),monthly,NA,1.20%,NA,2.80%,1.40%,Jan-26
+poultry,eu_broilers,European Union,292,€/100kg,weekly (monthly average),NA,1.80%,NA,4.30%,NA,Feb-26
+poultry,female_broiler_breeders_chicks_placed_weekly_average,United Kingdom,0.07,Chicks (m),monthly,NA,22%,NA,-47%,-41%,Oct-25
+poultry,poultry_meat_weekly_average,United Kingdom,38,Thousand Tonnes,monthly,NA,5.80%,NA,1.90%,3.40%,Jan-26
+poultry,turkey_slaughter_weekly_average,United Kingdom,0.11,Birds (m),monthly,NA,-40%,NA,0.30%,-17%,Jan-26
+poultry,turkeys_chicks_placed_weekly_average,United Kingdom,0.14,Chicks (m),monthly,NA,1.20%,NA,25%,-22%,Jan-26
+poultry,turkeys_eggs_set_weekly_average,United Kingdom,0.18,Eggs (m),monthly,NA,0.01%,NA,18%,-19%,Jan-26
+sheep,monthly_lamb_hogget_ni,Northern Ireland,589,p/kg,monthly,NA,-4.80%,NA,-9.60%,11%,Dec-25
+sheep,monthly_sqq_clean_lambs_gb,Great Britain,705,p/kg,monthly,NA,-0.01%,NA,-2.40%,18%,Jan-26
+sheep,weekly_average_clean_sheep_slaughter,United Kingdom,198,Head (th),monthly (weekly average),NA,-24%,NA,-3.30%,-7.40%,Jan-26
+sheep,weekly_average_mutton_lamb_production,United Kingdom,4.8,Tonnes (th),monthly (weekly average),NA,-21%,NA,0.49%,-5.20%,Jan-26
+sheep,weekly_lamb_hogget_ni,Northern Ireland,609,p/kg,weekly,1.60%,NA,NA,NA,NA,14/02/2026
+sheep,weekly_sqq_clean_lambs_gb,Great Britain,724,p/kg,weekly,1.50%,NA,NA,NA,NA,21/02/2026

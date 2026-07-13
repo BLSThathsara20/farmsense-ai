@@ -1,0 +1,44 @@
+# FarmSense AI — production-style compose (db + api)
+services:
+  db:
+    image: postgres:16-alpine
+    container_name: farmsense-db
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: farmsense
+      POSTGRES_DB: farmsense
+    ports:
+      - "5433:5432"
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+      - ./database/init.sql:/docker-entrypoint-initdb.d/01-init.sql:ro
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres -d farmsense"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  backend:
+    build:
+      context: .
+      dockerfile: backend/Dockerfile
+    container_name: farmsense-api
+    ports:
+      - "8000:8000"
+    environment:
+      DATABASE_URL: postgresql+psycopg://postgres:farmsense@db:5432/farmsense
+      JWT_SECRET: farmsense-docker-dev-secret
+      CORS_ORIGINS: http://localhost:5173,http://127.0.0.1:5173
+      ENVIRONMENT: development
+      ML_ARTIFACTS_DIR: /app/ml-models/artifacts
+      FRONTEND_URL: http://localhost:5173
+      RESEND_API_KEY: ${RESEND_API_KEY:-}
+      EMAIL_FROM: ${EMAIL_FROM:-FarmSense AI <onboarding@resend.dev>}
+    volumes:
+      - ./ml-models/artifacts:/app/ml-models/artifacts:ro
+    depends_on:
+      db:
+        condition: service_healthy
+
+volumes:
+  pgdata:
