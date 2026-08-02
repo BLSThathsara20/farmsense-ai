@@ -1,5 +1,5 @@
 import { useState, useEffect, useMemo } from 'react'
-import { useNavigate } from 'react-router-dom'
+import { useNavigate, useParams, Navigate } from 'react-router-dom'
 import { motion } from 'framer-motion'
 import {
   Droplets,
@@ -10,12 +10,15 @@ import {
   ArrowRight,
   Sprout,
   Trash2,
+  CalendarDays,
+  Scissors,
+  Banknote,
 } from 'lucide-react'
 import { PageWrapper } from '../components/layout/PageWrapper'
-import { Badge } from '../components/ui/Badge'
 import { Button } from '../components/ui/Button'
 import { Modal } from '../components/ui/Modal'
 import { SkeletonDashboard } from '../components/ui/Skeleton'
+import { DemoTag } from '../components/shared/DemoTag'
 import { ErrorState, EmptyState } from '../components/shared/EmptyState'
 import { CropCard } from '../components/shared/CropCard'
 import {
@@ -25,15 +28,16 @@ import {
 import { SuitabilityBar } from '../components/charts/SuitabilityBar'
 import { useRecommendations } from '../hooks/useMockData'
 import { useFarmStore } from '../store/farmStore'
+import { useSimpleMode } from '../hooks/useSimpleMode'
 import { useToast } from '../hooks/useToast'
-import { recommendationsService, getErrorMessage } from '../api'
+import { recommendationsService, getErrorMessage, apiConfig } from '../api'
 import { formatCurrency, formatShortDate } from '../lib/utils'
 
 const FACTOR_META = {
   soil: { icon: Droplets, fallbackTitle: 'Soil status' },
   weather: { icon: Cloud, fallbackTitle: 'Weather forecast' },
-  price: { icon: TrendingUp, fallbackTitle: 'Future price' },
-  demand: { icon: Users, fallbackTitle: 'Market demand' },
+  price: { icon: TrendingUp, fallbackTitle: 'Future price (£)' },
+  demand: { icon: Users, fallbackTitle: 'Demand and community pressure' },
 }
 
 function scoreTone(score) {
@@ -59,22 +63,30 @@ function getDecisionFactors(rec) {
     },
     {
       key: 'price',
-      title: 'Future price',
+      title: 'Future price (£)',
       score: rec?.priceTrend ?? 0,
-      detail: 'Expected market price around harvest / sell time.',
+      detail: 'Expected farm-gate guide price around harvest / sell time.',
     },
     {
       key: 'demand',
-      title: 'Market demand',
+      title: 'Demand and community pressure',
       score: rec?.demandSignal ?? 0,
-      detail: 'Local demand and risk that too many farms plant the same crop.',
+      detail: 'Public search interest and district planting pressure for this crop.',
     },
   ]
 }
 
+export function RecommendationsRedirect() {
+  const activePlanId = useFarmStore((s) => s.activePlanId)
+  if (activePlanId) return <Navigate to={`/plans/${activePlanId}`} replace />
+  return <Navigate to="/plans" replace />
+}
+
 export default function Recommendations() {
+  const { planId: routePlanId } = useParams()
   const navigate = useNavigate()
   const toast = useToast()
+  const simpleMode = useSimpleMode()
   const {
     loading,
     error,
@@ -86,18 +98,26 @@ export default function Recommendations() {
     finalized,
     selectedCropsFromServer,
     finalizedAt,
-  } = useRecommendations()
+    planId: loadedPlanId,
+    title: planTitle,
+  } = useRecommendations(routePlanId)
+  const planId = routePlanId || loadedPlanId
   const selectedCrops = useFarmStore((s) => s.selectedCrops)
   const toggleSelectedCrop = useFarmStore((s) => s.toggleSelectedCrop)
   const setSelectedCrops = useFarmStore((s) => s.setSelectedCrops)
   const confirmCropPlan = useFarmStore((s) => s.confirmCropPlan)
   const cropPlanConfirmedAt = useFarmStore((s) => s.cropPlanConfirmedAt)
+  const setActivePlanId = useFarmStore((s) => s.setActivePlanId)
 
   const [confirming, setConfirming] = useState(false)
   const [deleting, setDeleting] = useState(false)
   const [showDeleteModal, setShowDeleteModal] = useState(false)
 
-  const isFinalized = finalized || planStatus === 'finalized' || Boolean(cropPlanConfirmedAt)
+  const isFinalized = finalized || planStatus === 'finalized'
+
+  useEffect(() => {
+    if (planId) setActivePlanId(planId)
+  }, [planId, setActivePlanId])
 
   useEffect(() => {
     if (loading || !topRecommendation || recommendations.length === 0) return
@@ -116,8 +136,9 @@ export default function Recommendations() {
       return
     }
 
-    if (!finalized && !cropPlanConfirmedAt && selectedCrops.length === 0) {
+    if (!finalized && selectedCrops.length === 0) {
       setSelectedCrops([topRecommendation])
+      useFarmStore.setState({ cropPlanConfirmedAt: null })
     }
   }, [
     loading,
@@ -129,6 +150,7 @@ export default function Recommendations() {
     cropPlanConfirmedAt,
     finalizedAt,
     setSelectedCrops,
+    planId,
   ])
 
   const activeRec = useMemo(() => {
@@ -148,7 +170,10 @@ export default function Recommendations() {
     }
     setConfirming(true)
     try {
-      const result = await recommendationsService.confirmPlan(selectedCrops.map((c) => c.id))
+      const result = await recommendationsService.confirmPlan(
+        selectedCrops.map((c) => c.id),
+        planId
+      )
       const locked = result?.selectedCrops?.length ? result.selectedCrops : selectedCrops
       confirmCropPlan(locked, result?.finalizedAt)
       const names = locked.map((c) => c.crop).join(' & ')
@@ -164,15 +189,16 @@ export default function Recommendations() {
   const handleDeletePlan = async () => {
     setDeleting(true)
     try {
-      await recommendationsService.deletePlan()
+      await recommendationsService.deletePlan(planId)
       useFarmStore.setState({
         selectedCrops: [],
         cropPlanConfirmedAt: null,
         lastRecommendation: null,
+        activePlanId: null,
       })
       setShowDeleteModal(false)
-      toast.success('Plan deleted', 'Your crop plan was permanently removed.')
-      navigate('/plan')
+      toast.success('Plan deleted', 'This crop plan was permanently removed.')
+      navigate('/plans')
     } catch (err) {
       toast.error('Could not delete plan', getErrorMessage(err, 'Please try again.'))
     } finally {
@@ -212,7 +238,7 @@ export default function Recommendations() {
 
   const top = activeRec || topRecommendation
   const factors = getDecisionFactors(top)
-  const confirmedStamp = cropPlanConfirmedAt || finalizedAt
+  const confirmedStamp = finalizedAt || (isFinalized ? cropPlanConfirmedAt : null)
 
   return (
     <div className="flex flex-col lg:flex-row w-full min-h-0 flex-1">
@@ -222,7 +248,7 @@ export default function Recommendations() {
           confidence={top.confidence}
           profitEstimate={top.profitEstimate}
           isFinalized={isFinalized}
-          runLabel={`Generated ${formatShortDate(runDate)}`}
+          runLabel={planTitle || `Generated ${formatShortDate(runDate)}`}
           actions={
             <Button
               type="button"
@@ -238,91 +264,203 @@ export default function Recommendations() {
         />
 
         <PageWrapper className="!pb-48 md:!pb-36 lg:!max-w-none">
-          <div className="hidden lg:flex mb-6 items-start justify-between gap-3">
-            <div className="min-w-0">
-              <p className="ek-label mb-1">Generated {formatShortDate(runDate)}</p>
-              <h1 className="ek-headline text-2xl xl:text-3xl text-text-primary dark:text-text-dark-primary">
-                Your crop plan
-              </h1>
-              <p className="text-sm text-text-muted dark:text-text-dark-muted mt-1.5 max-w-xl">
-                {isFinalized
-                  ? 'This plan is finalized. Run Plan again to get a new draft.'
-                  : 'Draft — choose crops, then tap Finalize to save.'}
+          {apiConfig.useMock && (
+            <div className="mb-4 flex items-center gap-2">
+              <DemoTag />
+              <p className="text-xs text-text-muted dark:text-text-dark-muted">
+                Sample plan for demo — not live farm data.
               </p>
             </div>
+          )}
+
+          <div className="mb-4 flex items-center justify-between gap-3">
+            <button
+              type="button"
+              onClick={() => navigate('/plans')}
+              className="text-sm text-primary font-medium min-h-[44px]"
+            >
+              ← All plans
+            </button>
             <Button
               type="button"
               variant="ghost"
               size="sm"
-              className="shrink-0 text-error hover:bg-error/10"
+              className="hidden lg:inline-flex shrink-0 text-error hover:bg-error/10"
               onClick={() => setShowDeleteModal(true)}
               aria-label="Delete plan permanently"
             >
               <Trash2 className="h-4 w-4" />
-              <span className="hidden sm:inline">Delete</span>
+              Delete
             </Button>
           </div>
 
-          <p className="lg:hidden text-sm text-text-muted dark:text-text-dark-muted mb-4 -mt-1">
-            {isFinalized
-              ? 'Finalized plan — run Plan again for a new draft.'
-              : 'Draft — choose crops, then finalize below.'}
-          </p>
+          {/* Desktop: crop identity first */}
+          <motion.div
+            initial={{ opacity: 0, y: 10 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ duration: 0.28 }}
+            className="hidden lg:block mb-5"
+          >
+            <p className="ek-label mb-1">{planTitle || `Generated ${formatShortDate(runDate)}`}</p>
+            <h1 className="ek-headline text-2xl xl:text-3xl text-text-primary dark:text-text-dark-primary">
+              Plant {top.crop}
+            </h1>
+            <p className="mt-1 text-base text-text-secondary dark:text-text-dark-secondary">
+              About {formatCurrency(top.profitEstimate)} estimated · {top.confidence}% match
+            </p>
+          </motion.div>
 
           {isFinalized && confirmedStamp ? (
             <div className="mb-5 rounded-lg border border-primary/20 bg-primary/5 px-4 py-3">
               <p className="text-sm text-text-primary dark:text-text-dark-primary">
-                <span className="font-medium">Plan finalized</span>
+                <span className="font-medium">Saved plan</span>
                 <span className="text-text-muted"> · </span>
                 {selectedCrops.map((c) => c.crop).join(', ')}
                 <span className="text-text-muted"> · {formatShortDate(confirmedStamp)}</span>
               </p>
             </div>
           ) : (
-            <p className="mb-5 text-sm text-text-secondary dark:text-text-dark-secondary">
-              Soil steps are saved. Recommendations stay a{' '}
-              <span className="font-medium text-text-primary dark:text-text-dark-primary">draft</span>{' '}
-              until you confirm.
+            <p className="mb-4 text-sm text-text-secondary dark:text-text-dark-secondary">
+              Not saved yet. Check the times below, pick your crop, then tap{' '}
+              <span className="font-medium text-text-primary dark:text-text-dark-primary">
+                Finalize plan
+              </span>
+              .
             </p>
           )}
 
-          {/* Desktop top pick summary (mobile uses hero) */}
-          <motion.div
-            initial={{ opacity: 0, y: 12 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ duration: 0.3 }}
-            className="hidden lg:block mb-6"
-          >
-            <div className="border-b border-border dark:border-border-dark pb-5">
-              <p className="ek-label mb-2">
-                {isFinalized
-                  ? 'Finalized pick'
-                  : selectedCrops.length > 1
-                    ? 'Top of your selection'
-                    : 'Top pick'}
-              </p>
-              <h2 className="ek-headline text-3xl xl:text-4xl text-text-primary dark:text-text-dark-primary mb-1">
-                {top.crop}
+          {/* MAIN for farmers: when to sow / harvest / sell */}
+          <section className="mb-6" aria-labelledby="plan-times-heading">
+            <div className="mb-3">
+              <h2
+                id="plan-times-heading"
+                className="text-lg font-semibold text-text-primary dark:text-text-dark-primary"
+              >
+                Your next steps · {top.crop}
               </h2>
-              <p className="ek-mono-data text-lg text-text-secondary dark:text-text-dark-secondary mb-4">
-                {formatCurrency(top.profitEstimate)} est. profit
+              <p className="text-sm text-text-muted dark:text-text-dark-muted mt-0.5">
+                Three times that matter most on the farm.
               </p>
-              <SuitabilityBar score={top.confidence} label="Overall confidence" />
             </div>
-          </motion.div>
+
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+              {[
+                {
+                  key: 'sow',
+                  label: 'When to sow',
+                  hint: 'Put seed in the ground',
+                  value: top.plantingWindow?.sow,
+                  Icon: CalendarDays,
+                  tone: 'bg-primary/10 text-primary border-primary/20',
+                },
+                {
+                  key: 'harvest',
+                  label: 'When to harvest',
+                  hint: 'Take the crop out',
+                  value: top.plantingWindow?.harvest,
+                  Icon: Scissors,
+                  tone: 'bg-emerald-600/10 text-emerald-700 dark:text-emerald-300 border-emerald-600/20',
+                },
+                {
+                  key: 'sell',
+                  label: 'When to sell',
+                  hint: 'Best window for money',
+                  value: top.plantingWindow?.sell,
+                  Icon: Banknote,
+                  tone: 'bg-accent/10 text-accent border-accent/25',
+                },
+              ].map(({ key, label, hint, value, Icon, tone }) => (
+                <div
+                  key={key}
+                  className={`rounded-xl border px-4 py-4 min-h-[112px] flex flex-col ${tone}`}
+                >
+                  <div className="flex items-center gap-2 mb-2">
+                    <Icon className="h-5 w-5 shrink-0" aria-hidden="true" />
+                    <p className="text-sm font-semibold">{label}</p>
+                  </div>
+                  <p className="font-mono text-xl sm:text-2xl font-medium text-text-primary dark:text-text-dark-primary leading-tight">
+                    {value || '—'}
+                  </p>
+                  <p className="text-xs mt-2 opacity-80" data-detail>
+                    {hint}
+                  </p>
+                </div>
+              ))}
+            </div>
+
+            <button
+              type="button"
+              onClick={() => navigate('/market')}
+              className="mt-3 w-full sm:w-auto inline-flex items-center justify-center gap-2 min-h-[48px] px-4 rounded-lg border border-border dark:border-border-dark text-sm font-medium text-text-primary dark:text-text-dark-primary hover:bg-surface-alt dark:hover:bg-surface-dark-alt transition-colors"
+            >
+              Check sell prices now
+              <ArrowRight className="h-4 w-4" />
+            </button>
+          </section>
+
+          {top.oversupplyRisk > 0.6 && (
+            <div className="mb-6 flex items-start gap-3 rounded-lg border border-accent/30 bg-accent/10 px-4 py-3">
+              <AlertTriangle className="h-5 w-5 text-accent shrink-0 mt-0.5" />
+              <div>
+                <p className="font-medium text-text-primary dark:text-text-dark-primary">
+                  Watch out · many farms may plant {top.crop}
+                </p>
+                <p className="text-sm text-text-secondary dark:text-text-dark-secondary mt-0.5">
+                  About {Math.round(top.oversupplyRisk * 100)}% risk in your area. Consider mixing
+                  another crop.
+                </p>
+              </div>
+            </div>
+          )}
 
           <section className="mb-8">
-            <h2 className="font-medium text-text-primary dark:text-text-dark-primary mb-1">
-              Why {top.crop}?
+            <h2 className="text-base font-semibold text-text-primary dark:text-text-dark-primary mb-1">
+              {isFinalized ? 'Crops in this plan' : '1. Pick your crop'}
+            </h2>
+            <p className="text-sm text-text-muted dark:text-text-dark-muted mb-3">
+              {isFinalized
+                ? 'Locked. Start a new plan if you want to change.'
+                : 'Tap one or more. Times above follow your top pick.'}
+            </p>
+            <div className="space-y-3">
+              {recommendations.map((rec) => (
+                <CropCard
+                  key={rec.id}
+                  crop={rec.crop}
+                  confidence={rec.confidence}
+                  profitEstimate={rec.profitEstimate}
+                  rank={rec.rank}
+                  compact
+                  selectable={!isFinalized}
+                  selected={isSelected(rec.id)}
+                  onClick={isFinalized ? undefined : () => toggleSelectedCrop(rec)}
+                />
+              ))}
+            </div>
+          </section>
+
+          {/* Trust / detail second — farmers decide action first */}
+          <section className="mb-8" data-detail>
+            <h2 className="text-base font-semibold text-text-primary dark:text-text-dark-primary mb-1">
+              2. Why {top.crop}?
             </h2>
             <p className="text-xs text-text-muted dark:text-text-dark-muted mb-4">
-              Four checks combined — not soil alone.
+              Four checks — soil, weather, price, and demand. Read this if you want to trust the tip.
             </p>
+
+            <div className="mb-5">
+              <SuitabilityBar score={top.confidence} label="Overall confidence" />
+            </div>
 
             <div className="space-y-5">
               {factors.map((factor) => {
                 const meta = FACTOR_META[factor.key] || FACTOR_META.soil
                 const Icon = meta.icon
+                const isFallbackDemand =
+                  factor.key === 'demand' &&
+                  String(factor.detail || '')
+                    .toLowerCase()
+                    .includes('fallback community-pressure')
                 return (
                   <div key={factor.key} className="space-y-2">
                     <div className="flex items-start gap-3">
@@ -334,9 +472,12 @@ export default function Recommendations() {
                           <p className="text-sm font-semibold text-text-primary dark:text-text-dark-primary">
                             {factor.title || meta.fallbackTitle}
                           </p>
-                          <span className="text-[11px] font-medium text-text-muted dark:text-text-dark-muted shrink-0">
-                            {scoreTone(factor.score)}
-                          </span>
+                          <div className="flex items-center gap-2 shrink-0">
+                            {isFallbackDemand && <DemoTag />}
+                            <span className="text-[11px] font-medium text-text-muted dark:text-text-dark-muted">
+                              {scoreTone(factor.score)}
+                            </span>
+                          </div>
                         </div>
                         <p className="text-xs text-text-secondary dark:text-text-dark-secondary mt-0.5 leading-relaxed">
                           {factor.detail}
@@ -361,72 +502,6 @@ export default function Recommendations() {
             )}
           </section>
 
-          <section className="mb-8">
-            <h2 className="text-sm font-medium text-text-secondary dark:text-text-dark-secondary mb-1">
-              {isFinalized ? 'Your finalized crops' : 'Choose your crops'}
-            </h2>
-            <p className="text-xs text-text-muted dark:text-text-dark-muted mb-3">
-              {isFinalized
-                ? 'Locked in — change only by running a new Plan'
-                : 'Select one or more — mix if you have the space'}
-            </p>
-            <div className="space-y-3">
-              {recommendations.map((rec) => (
-                <CropCard
-                  key={rec.id}
-                  crop={rec.crop}
-                  confidence={rec.confidence}
-                  profitEstimate={rec.profitEstimate}
-                  rank={rec.rank}
-                  compact
-                  selectable={!isFinalized}
-                  selected={isSelected(rec.id)}
-                  onClick={isFinalized ? undefined : () => toggleSelectedCrop(rec)}
-                />
-              ))}
-            </div>
-          </section>
-
-          <section className="mb-8">
-            <h3 className="font-medium text-text-primary dark:text-text-dark-primary mb-4">
-              Planting timeline · {top.crop}
-            </h3>
-            <div className="grid grid-cols-3 gap-3 text-center">
-              {[
-                { label: 'Sow', value: top.plantingWindow?.sow },
-                { label: 'Harvest', value: top.plantingWindow?.harvest },
-                { label: 'Sell', value: top.plantingWindow?.sell },
-              ].map(({ label, value }) => (
-                <div
-                  key={label}
-                  className="py-3 border-t border-border dark:border-border-dark"
-                >
-                  <Badge variant="neutral" size="sm" className="mb-1.5">
-                    {label}
-                  </Badge>
-                  <p className="font-mono text-sm text-text-primary dark:text-text-dark-primary">
-                    {value || '—'}
-                  </p>
-                </div>
-              ))}
-            </div>
-          </section>
-
-          {top.oversupplyRisk > 0.6 && (
-            <div className="mb-6 flex items-start gap-3 rounded-lg border border-accent/30 bg-accent/10 px-4 py-3">
-              <AlertTriangle className="h-5 w-5 text-accent shrink-0 mt-0.5" />
-              <div>
-                <p className="font-medium text-text-primary dark:text-text-dark-primary">
-                  Oversupply risk · {top.crop}
-                </p>
-                <p className="text-sm text-text-secondary dark:text-text-dark-secondary mt-0.5">
-                  {Math.round(top.oversupplyRisk * 100)}% of farmers in your district may plant this.
-                  Consider diversifying your selection.
-                </p>
-              </div>
-            </div>
-          )}
-
           <div className="h-24 md:h-20" aria-hidden />
         </PageWrapper>
 
@@ -435,25 +510,27 @@ export default function Recommendations() {
             <div className="flex-1 min-w-0">
               <p className="text-sm font-medium text-text-primary dark:text-text-dark-primary truncate">
                 {selectedCrops.length === 0
-                  ? 'No crops selected'
+                  ? 'Pick a crop above'
                   : selectedCrops.map((c) => c.crop).join(', ')}
               </p>
               <p className="text-xs text-text-muted dark:text-text-dark-muted">
                 {isFinalized
-                  ? 'Finalized plan'
-                  : `${selectedCrops.length} crop${selectedCrops.length !== 1 ? 's' : ''} selected · draft`}
+                  ? 'Plan saved'
+                  : selectedCrops.length === 0
+                    ? 'Then save your plan'
+                    : `Sow ${top.plantingWindow?.sow || '—'} · Sell ${top.plantingWindow?.sell || '—'}`}
               </p>
             </div>
             {isFinalized ? (
-              <Button variant="secondary" className="shrink-0" onClick={() => navigate('/plan')}>
-                New plan
+              <Button variant="secondary" className="shrink-0" onClick={() => navigate('/plans')}>
+                All plans
               </Button>
             ) : (
               <Button
                 onClick={handleConfirm}
                 loading={confirming}
                 disabled={selectedCrops.length === 0}
-                className="shrink-0"
+                className="shrink-0 min-h-[48px]"
               >
                 Finalize plan
                 <ArrowRight className="h-4 w-4" />
@@ -463,12 +540,15 @@ export default function Recommendations() {
         </div>
       </div>
 
-      <RecommendationsVisualPanel
-        crop={top.crop}
-        confidence={top.confidence}
-        profitEstimate={top.profitEstimate}
-        isFinalized={isFinalized}
-      />
+      {!simpleMode && (
+        <RecommendationsVisualPanel
+          crop={top.crop}
+          confidence={top.confidence}
+          profitEstimate={top.profitEstimate}
+          isFinalized={isFinalized}
+          plantingWindow={top.plantingWindow}
+        />
+      )}
 
       <Modal
         isOpen={showDeleteModal}

@@ -12,7 +12,13 @@ const loadRecsAsideBg = () => import('../../assets/backgrounds/recommendations-a
  * Full-height visual plane for Recommendations (desktop).
  * The succulent photo is the dominant edge-to-edge surface — not a card.
  */
-export function RecommendationsVisualPanel({ crop, confidence, profitEstimate, isFinalized }) {
+export function RecommendationsVisualPanel({
+  crop,
+  confidence,
+  profitEstimate,
+  isFinalized,
+  plantingWindow,
+}) {
   const loader = useCallback(() => loadRecsAsideBg(), [])
 
   return (
@@ -46,14 +52,14 @@ export function RecommendationsVisualPanel({ crop, confidence, profitEstimate, i
               exit={{ opacity: 0, y: -8 }}
               transition={spring.gentle}
             >
-              <p className="ek-label !text-white/55 mb-2">Focus crop</p>
+              <p className="ek-label !text-white/55 mb-2">Plant this</p>
               <h2 className="font-display text-4xl xl:text-5xl font-semibold text-white tracking-tight leading-[1.05] drop-shadow-sm">
                 {crop || 'Your plan'}
               </h2>
               {confidence != null && (
                 <p className="mt-4 text-sm text-white/80">
                   <span className="font-mono text-lg text-white">{confidence}%</span>
-                  <span className="text-white/55"> confidence</span>
+                  <span className="text-white/55"> match</span>
                 </p>
               )}
               {profitEstimate != null && (
@@ -65,8 +71,22 @@ export function RecommendationsVisualPanel({ crop, confidence, profitEstimate, i
             </motion.div>
           </AnimatePresence>
 
+          <div className="mt-8 space-y-3 border-t border-white/15 pt-6">
+            <p className="ek-label !text-white/50 mb-1">Next steps</p>
+            {[
+              { label: 'Sow', value: plantingWindow?.sow },
+              { label: 'Harvest', value: plantingWindow?.harvest },
+              { label: 'Sell', value: plantingWindow?.sell },
+            ].map(({ label, value }) => (
+              <div key={label} className="flex items-baseline justify-between gap-3">
+                <span className="text-sm text-white/65">{label}</span>
+                <span className="font-mono text-sm text-white">{value || '—'}</span>
+              </div>
+            ))}
+          </div>
+
           <p className="mt-8 text-sm text-white/60 leading-relaxed max-w-[22rem]">
-            Grown from your soil, weather outlook, and market signals — pick what fits this season.
+            First decide what and when. The “why” details can wait.
           </p>
         </div>
       </div>
