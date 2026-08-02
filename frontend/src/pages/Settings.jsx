@@ -34,8 +34,15 @@ export default function Settings() {
           setProfile(data)
           if (data?.user) updateProfile(data.user)
         }
-      } catch {
-        if (!cancelled) setProfile(null)
+      } catch (err) {
+        if (!cancelled) {
+          setProfile(null)
+          if (err?.status === 401 || err?.status === 403) {
+            useFarmStore.getState().resetFarmData()
+            logout()
+            navigate('/login')
+          }
+        }
       } finally {
         if (!cancelled) setProfileLoading(false)
       }
@@ -43,7 +50,7 @@ export default function Settings() {
     return () => {
       cancelled = true
     }
-  }, [updateProfile])
+  }, [updateProfile, logout, navigate])
 
   const handleSignOut = () => {
     useFarmStore.getState().resetFarmData()
@@ -65,7 +72,9 @@ export default function Settings() {
     <PageWrapper>
       <SectionHeader title="Settings" subtitle="Account, saved data & system health" />
 
-      <SystemStatusPanel />
+      <div data-detail>
+        <SystemStatusPanel />
+      </div>
 
       <Card variant="bordered" className="mb-4">
         <div className="flex items-center justify-between mb-4">
@@ -133,7 +142,7 @@ export default function Settings() {
                 <span className="font-medium">{saved.lastRecommendation.topCrop}</span>
               </div>
             )}
-            <p className="text-xs text-text-muted pt-2 border-t border-border dark:border-border-dark">
+            <p className="text-xs text-text-muted pt-2 border-t border-border dark:border-border-dark" data-detail>
               Come back anytime — your data stays in PostgreSQL until you delete your account.
             </p>
           </div>
@@ -149,13 +158,19 @@ export default function Settings() {
           <HelpCircle className="h-5 w-5 text-primary shrink-0" />
           <div className="flex-1 min-w-0">
             <p className="text-sm font-medium">Help guide</p>
-            <p className="text-xs text-text-muted">Register, connect backend, verify data saves</p>
+            <p className="text-xs text-text-muted" data-detail>
+              Register, connect backend, verify data saves
+            </p>
           </div>
         </Card>
       </Link>
 
       <Card variant="bordered" className="mb-4">
         <h2 className="ek-label mb-4">Notifications</h2>
+        <p className="text-sm text-text-secondary dark:text-text-dark-secondary mb-3">
+          Saved prototype preferences for future alert delivery. They do not send live notifications
+          yet.
+        </p>
         <div className="space-y-1">
           <Toggle
             label="Sell window alerts"
@@ -173,6 +188,47 @@ export default function Settings() {
             onChange={(v) => setNotifications({ communityUpdates: v })}
           />
         </div>
+      </Card>
+
+      <Card variant="bordered" className="mb-4">
+        <h2 className="ek-label mb-2">Ease of use</h2>
+        <p className="text-sm text-text-secondary dark:text-text-dark-secondary mb-3">
+          Bigger text. Only the most important information.
+        </p>
+        <Toggle
+          label="Simple mode"
+          checked={Boolean(user?.simpleMode)}
+          onChange={async (v) => {
+            try {
+              const res = await authService.updatePreferences({ simpleMode: v })
+              updateProfile(res?.user || { simpleMode: v })
+              toast.success(v ? 'Simple mode on' : 'Simple mode off')
+            } catch {
+              toast.error('Could not save', 'Try again in a moment.')
+            }
+          }}
+        />
+      </Card>
+
+      <Card variant="bordered" className="mb-4">
+        <h2 className="ek-label mb-2">Demo data</h2>
+        <p className="text-sm text-text-secondary dark:text-text-dark-secondary mb-3">
+          Keep real data when available. If a screen has nothing to show yet, fill it with sample
+          data and mark it Demo.
+        </p>
+        <Toggle
+          label="Enable demo data mode"
+          checked={Boolean(user?.demoDataMode)}
+          onChange={async (v) => {
+            try {
+              const res = await authService.updatePreferences({ demoDataMode: v })
+              updateProfile(res?.user || { demoDataMode: v })
+              toast.success(v ? 'Demo data mode on' : 'Demo data mode off')
+            } catch {
+              toast.error('Could not save', 'Try again in a moment.')
+            }
+          }}
+        />
       </Card>
 
       <Card variant="bordered" className="mb-4">
@@ -197,6 +253,9 @@ export default function Settings() {
 
       <Card variant="bordered" className="mb-4">
         <h2 className="ek-label mb-4">Units</h2>
+        <p className="text-sm text-text-secondary dark:text-text-dark-secondary mb-3">
+          Saved display preference. Full unit conversion is only applied in some prototype screens.
+        </p>
         <div className="flex gap-2">
           {['metric', 'imperial'].map((u) => (
             <button
@@ -215,7 +274,7 @@ export default function Settings() {
         </div>
       </Card>
 
-      <Card variant="bordered" className="mb-8 bg-primary/5">
+      <Card variant="bordered" className="mb-8 bg-primary/5" data-detail>
         <h2 className="text-sm font-medium mb-2">Data &amp; privacy</h2>
         <p className="text-sm text-text-secondary leading-relaxed">
           Farm data is stored securely per account. District community stats use anonymised counts

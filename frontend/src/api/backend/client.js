@@ -27,12 +27,21 @@ function request(path, options = {}) {
 }
 
 export const backendClient = {
-  get: (path, params) => request(path, { method: 'GET', params }),
+  get: (path, params, options = {}) =>
+    request(path, { method: 'GET', params, timeout: options.timeout }),
   post: (path, body, options = {}) =>
-    request(path, { method: 'POST', body, headers: options.headers }),
-  put: (path, body) => request(path, { method: 'PUT', body }),
-  patch: (path, body) => request(path, { method: 'PATCH', body }),
-  delete: (path) => request(path, { method: 'DELETE' }),
+    request(path, {
+      method: 'POST',
+      body,
+      headers: options.headers,
+      timeout: options.timeout,
+    }),
+  put: (path, body, options = {}) =>
+    request(path, { method: 'PUT', body, timeout: options.timeout }),
+  patch: (path, body, options = {}) =>
+    request(path, { method: 'PATCH', body, timeout: options.timeout }),
+  delete: (path, options = {}) =>
+    request(path, { method: 'DELETE', timeout: options.timeout }),
 }
 
 export { backendEndpoints }

@@ -27,7 +27,7 @@ export function InfoTip({ text, className, align = 'left' }) {
   if (!text) return null
 
   return (
-    <span ref={ref} className={cn('relative inline-flex align-middle', className)}>
+    <span ref={ref} data-detail className={cn('relative inline-flex align-middle', className)}>
       <button
         type="button"
         aria-label="More information"

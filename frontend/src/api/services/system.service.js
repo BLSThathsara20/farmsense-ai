@@ -6,6 +6,11 @@ export const systemService = {
     return backendClient.get(backendEndpoints.health)
   },
 
+  /** Short timed probe used only for limited offline reconnect (max 5). */
+  async probeHealth(timeoutMs = 3000) {
+    return backendClient.get(backendEndpoints.health, undefined, { timeout: timeoutMs })
+  },
+
   async getReadiness() {
     return backendClient.get(backendEndpoints.healthReady)
   },

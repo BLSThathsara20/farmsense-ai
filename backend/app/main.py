@@ -12,7 +12,7 @@ from sqlalchemy import desc, select, text
 from sqlalchemy.orm import Session
 
 from app.core.config import get_settings
-from app.core.deps import IdempotencyGuard, get_current_user, idempotency_key_header, require_admin
+from app.core.deps import IdempotencyGuard, get_current_user, get_optional_user, idempotency_key_header, require_admin
 from app.core.exceptions import (
     AppError,
     ServiceUnavailableError,
@@ -32,7 +32,9 @@ from app.schemas import (
     ForgotPasswordRequest,
     LoginRequest,
     OversupplyInput,
+    PreferencesRequest,
     RegisterRequest,
+    RenamePlanRequest,
     ResetPasswordRequest,
     SoilInput,
     SoilSubmitRequest,
@@ -46,20 +48,25 @@ from app.services.admin_service import (
     set_farmer_active,
 )
 from app.services.model_lab_service import DEFAULT_PAYLOADS, model_lab_status, run_model_lab
-from app.services.auth_service import login_user, register_user, user_to_json
+from app.services.auth_service import login_user, register_user, update_user_preferences, user_to_json
 from app.services.password_reset_service import request_password_reset, reset_password
 from app.services.profile_service import get_user_profile
 from app.services.recommendation_service import (
     community_payload,
     dashboard_payload,
+    delete_plan,
     delete_recommendation_plans,
     finalize_recommendation_run,
     generate_recommendation_run,
     get_market_payload,
+    get_plan,
     latest_recommendations,
     list_active_crops,
+    list_plans,
+    plans_overview,
+    rename_plan,
 )
-from app.services.seed_service import ensure_farm_has_demo_aggregates, seed_reference_data
+from app.services.seed_service import seed_reference_data
 from app.services.soil_service import create_soil_reading, get_primary_farm
 
 settings = get_settings()
@@ -214,6 +221,22 @@ def build_router() -> APIRouter:
     ):
         return get_user_profile(db, user)
 
+    @router.patch("/auth/preferences")
+    @limiter.limit("60/minute")
+    def auth_preferences(
+        request: Request,
+        payload: PreferencesRequest,
+        db: Annotated[Session, Depends(get_db)],
+        user: Annotated[UserAccount, Depends(get_current_user)],
+    ):
+        updated, farm = update_user_preferences(
+            db,
+            user,
+            simple_mode=payload.simpleMode,
+            demo_data_mode=payload.demoDataMode,
+        )
+        return {"user": user_to_json(updated, farm)}
+
     @router.post("/soil")
     @limiter.limit("30/minute")
     def submit_soil(
@@ -231,6 +254,8 @@ def build_router() -> APIRouter:
             recs = generate_recommendation_run(db, farm, reading)
             return 201, {
                 "soilReadingId": str(reading.id),
+                "planId": recs.get("planId") or recs.get("runId"),
+                "runId": recs.get("runId"),
                 "recommendations": recs,
             }
 
@@ -271,22 +296,108 @@ def build_router() -> APIRouter:
     ):
         farm = get_primary_farm(db, user)
         try:
-            return finalize_recommendation_run(db, farm, payload.cropIds)
+            return finalize_recommendation_run(
+                db, farm, payload.cropIds, run_id=payload.planId
+            )
         except ValueError as exc:
             raise HTTPException(status_code=400, detail=str(exc)) from exc
 
     @router.delete("/recommendations/plan")
     @limiter.limit("20/minute")
-    def delete_plan(
+    def delete_all_plans(
         request: Request,
         db: Annotated[Session, Depends(get_db)],
         user: Annotated[UserAccount, Depends(get_current_user)],
     ):
-        """Permanently delete the farm's crop recommendation plan(s). Soil readings are kept."""
+        """Permanently delete all crop recommendation plans for this farm. Soil readings are kept."""
         from app.core.middleware import response_cache
 
         farm = get_primary_farm(db, user)
         result = delete_recommendation_plans(db, farm)
+        key = cache_key("GET", "/dashboard", "", str(user.id))
+        response_cache.pop(key, None)
+        return result
+
+    # —— Multi-plan APIs ——
+    @router.get("/plans")
+    @limiter.limit(settings.rate_limit_default)
+    def get_plans(
+        request: Request,
+        db: Annotated[Session, Depends(get_db)],
+        user: Annotated[UserAccount, Depends(get_current_user)],
+    ):
+        farm = get_primary_farm(db, user)
+        return {"plans": list_plans(db, farm)}
+
+    @router.get("/plans/overview")
+    @limiter.limit(settings.rate_limit_default)
+    def get_plans_overview(
+        request: Request,
+        db: Annotated[Session, Depends(get_db)],
+        user: Annotated[UserAccount, Depends(get_current_user)],
+    ):
+        farm = get_primary_farm(db, user)
+        return plans_overview(db, farm)
+
+    @router.get("/plans/{plan_id}")
+    @limiter.limit(settings.rate_limit_default)
+    def get_plan_by_id(
+        request: Request,
+        plan_id: str,
+        db: Annotated[Session, Depends(get_db)],
+        user: Annotated[UserAccount, Depends(get_current_user)],
+    ):
+        farm = get_primary_farm(db, user)
+        plan = get_plan(db, farm, plan_id)
+        if not plan:
+            raise HTTPException(status_code=404, detail="Plan not found.")
+        return plan
+
+    @router.post("/plans/{plan_id}/confirm")
+    @limiter.limit("30/minute")
+    def confirm_plan_by_id(
+        request: Request,
+        plan_id: str,
+        payload: ConfirmPlanRequest,
+        db: Annotated[Session, Depends(get_db)],
+        user: Annotated[UserAccount, Depends(get_current_user)],
+    ):
+        farm = get_primary_farm(db, user)
+        try:
+            return finalize_recommendation_run(db, farm, payload.cropIds, run_id=plan_id)
+        except ValueError as exc:
+            raise HTTPException(status_code=400, detail=str(exc)) from exc
+
+    @router.patch("/plans/{plan_id}")
+    @limiter.limit("30/minute")
+    def patch_plan(
+        request: Request,
+        plan_id: str,
+        payload: RenamePlanRequest,
+        db: Annotated[Session, Depends(get_db)],
+        user: Annotated[UserAccount, Depends(get_current_user)],
+    ):
+        farm = get_primary_farm(db, user)
+        try:
+            return rename_plan(db, farm, plan_id, payload.title)
+        except ValueError as exc:
+            raise HTTPException(status_code=400, detail=str(exc)) from exc
+
+    @router.delete("/plans/{plan_id}")
+    @limiter.limit("20/minute")
+    def delete_plan_by_id(
+        request: Request,
+        plan_id: str,
+        db: Annotated[Session, Depends(get_db)],
+        user: Annotated[UserAccount, Depends(get_current_user)],
+    ):
+        from app.core.middleware import response_cache
+
+        farm = get_primary_farm(db, user)
+        try:
+            result = delete_plan(db, farm, plan_id)
+        except ValueError as exc:
+            raise HTTPException(status_code=404, detail=str(exc)) from exc
         key = cache_key("GET", "/dashboard", "", str(user.id))
         response_cache.pop(key, None)
         return result
@@ -299,7 +410,6 @@ def build_router() -> APIRouter:
         user: Annotated[UserAccount, Depends(get_current_user)],
     ):
         farm = get_primary_farm(db, user)
-        ensure_farm_has_demo_aggregates(db, farm)
         recs = latest_recommendations(db, farm)
         reading = db.scalar(
             select(SoilReading)
@@ -332,12 +442,14 @@ def build_router() -> APIRouter:
         request: Request,
         db: Annotated[Session, Depends(get_db)],
         crop: Annotated[str, Query()] = "Tomato",
+        user: Annotated[UserAccount | None, Depends(get_optional_user)] = None,
     ):
-        key = cache_key("GET", "/market", f"crop={crop}", None)
+        demo = bool(getattr(user, "demo_data_mode", False)) if user else False
+        key = cache_key("GET", "/market", f"crop={crop}:demo={int(demo)}", str(user.id) if user else None)
         cached = get_cached_response(key)
         if cached:
             return cached
-        payload = {"crop": crop, "data": get_market_payload(db, crop)}
+        payload = {"crop": crop, "data": get_market_payload(db, crop, demo_data_mode=demo)}
         set_cached_response(key, payload)
         return payload
 
@@ -349,12 +461,20 @@ def build_router() -> APIRouter:
         user: Annotated[UserAccount, Depends(get_current_user)],
     ):
         farm = get_primary_farm(db, user)
-        ensure_farm_has_demo_aggregates(db, farm)
-        key = cache_key("GET", "/community", farm.district_code, str(user.id))
+        key = cache_key(
+            "GET",
+            "/community",
+            f"{farm.district_code}:demo={int(bool(getattr(user, 'demo_data_mode', False)))}",
+            str(user.id),
+        )
         cached = get_cached_response(key)
         if cached:
             return cached
-        payload = community_payload(db, farm)
+        payload = community_payload(
+            db,
+            farm,
+            demo_data_mode=bool(getattr(user, "demo_data_mode", False)),
+        )
         set_cached_response(key, payload)
         return payload
 

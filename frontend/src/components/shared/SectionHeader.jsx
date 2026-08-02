@@ -8,7 +8,7 @@ export function SectionHeader({ title, subtitle, action, className }) {
           {title}
         </h2>
         {subtitle && (
-          <p className="text-sm text-text-secondary dark:text-text-dark-secondary mt-0.5">
+          <p className="text-sm text-text-secondary dark:text-text-dark-secondary mt-0.5" data-detail>
             {subtitle}
           </p>
         )}

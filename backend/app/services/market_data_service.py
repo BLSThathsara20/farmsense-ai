@@ -134,7 +134,18 @@ def _forecast_tail(series: pd.Series, horizon: int = 4) -> dict:
     }
 
 
-def build_market_chart(series: pd.Series, outlook: dict, history: int = 8) -> list[dict]:
+def _month_start(ts) -> pd.Timestamp:
+    ts = pd.Timestamp(ts)
+    return ts.normalize().replace(day=1)
+
+
+def months_between(a: pd.Timestamp, b: pd.Timestamp) -> int:
+    """Whole calendar months from month-start a to month-start b (b - a)."""
+    return (b.year - a.year) * 12 + (b.month - a.month)
+
+
+def build_market_chart(series: pd.Series, outlook: dict, history: int = 8) -> tuple[list[dict], str | None]:
+    """Continuous chart: real history → estimated gap months → future forecast (no holes)."""
     tail = series.iloc[-history:]
     rows: list[dict] = []
     for i, (ts, price) in enumerate(tail.items()):
@@ -148,37 +159,65 @@ def build_market_chart(series: pd.Series, outlook: dict, history: int = 8) -> li
                 "lower": None,
                 "upper": None,
                 "isForecast": False,
+                "isEstimated": False,
+                "indexPrice": round(float(price), 1),
             }
         )
+
     preds = outlook.get("predictions") or []
     last_ts = tail.index[-1] if len(tail) else None
-    for i, pred in enumerate(preds, start=1):
-        if last_ts is not None and hasattr(last_ts, "to_period"):
-            fut = (last_ts.to_period("M") + i).to_timestamp()
-            label = fut.strftime("%b %Y")
-        else:
-            label = f"F{i}"
-        rows.append(
-            {
-                "week": label,
-                "weekNum": i,
-                "price": round(float(pred), 1),
-                "forecast": round(float(pred), 1),
-                "lower": round(float(pred) * 0.97, 1),
-                "upper": round(float(pred) * 1.03, 1),
-                "isForecast": True,
-            }
-        )
-    return rows
+    data_lag_note: str | None = None
+
+    if last_ts is not None and preds:
+        last_month = _month_start(last_ts)
+        today_month = _month_start(pd.Timestamp.today())
+        # Forecast always begins the month AFTER the latest published index — no gap.
+        forecast_start = last_month + pd.DateOffset(months=1)
+        # Months already elapsed since last data (published lag) become "estimated" nowcasts.
+        gap_months = max(0, months_between(last_month, today_month))
+
+        if gap_months > 0:
+            data_lag_note = (
+                f"GOV.UK index is published through {last_month.strftime('%b %Y')}. "
+                f"{forecast_start.strftime('%b %Y')}–{today_month.strftime('%b %Y')} are model "
+                f"estimates until Defra publishes; later months are forecast."
+            )
+
+        for i, pred in enumerate(preds, start=1):
+            fut = forecast_start + pd.DateOffset(months=i - 1)
+            # Months up to and including the current month are "estimated" (data not yet out)
+            is_estimated = months_between(forecast_start, fut) < gap_months
+            rows.append(
+                {
+                    "week": fut.strftime("%b %Y"),
+                    "weekNum": i,
+                    "price": round(float(pred), 1),
+                    "forecast": round(float(pred), 1),
+                    "lower": round(float(pred) * 0.97, 1),
+                    "upper": round(float(pred) * 1.03, 1),
+                    "isForecast": True,
+                    "isEstimated": is_estimated,
+                    "indexPrice": round(float(pred), 1),
+                }
+            )
+
+    return rows, data_lag_note
 
 
-def planting_interest(db: Session, crop_name: str) -> dict:
-    """Share of recent community plans targeting this crop (real DB aggregates)."""
+def planting_interest(db: Session, crop_name: str, *, demo_data_mode: bool = False) -> dict:
+    """District planting share for this crop from finalized community plans."""
     crop = db.scalar(
         select(CropReference).where(CropReference.display_name.ilike(crop_name.strip())).limit(1)
     )
     if not crop:
-        return {"label": "No local data", "detail": "Crop not in reference list yet.", "sharePct": None}
+        if demo_data_mode:
+            return {
+                "label": "Moderate interest",
+                "detail": "Sample district planting share for demos.",
+                "sharePct": 18.0,
+                "demo": True,
+            }
+        return {"label": "No local data", "detail": "Crop not in reference list yet.", "sharePct": None, "demo": False}
 
     latest = db.scalar(
         select(DistrictCropAggregate)
@@ -186,10 +225,18 @@ def planting_interest(db: Session, crop_name: str) -> dict:
         .limit(1)
     )
     if not latest:
+        if demo_data_mode:
+            return {
+                "label": "Moderate interest",
+                "detail": "Sample: about 18% of recent demo plans chose this crop in the district view.",
+                "sharePct": 18.0,
+                "demo": True,
+            }
         return {
             "label": "No plans yet",
             "detail": "Community planting totals appear after farms finalize plans.",
             "sharePct": None,
+            "demo": False,
         }
 
     year, week = latest.season_year, latest.week_number
@@ -213,10 +260,18 @@ def planting_interest(db: Session, crop_name: str) -> dict:
         or 0
     )
     if total <= 0:
+        if demo_data_mode:
+            return {
+                "label": "Moderate interest",
+                "detail": "Sample: about 18% of recent demo plans chose this crop in the district view.",
+                "sharePct": 18.0,
+                "demo": True,
+            }
         return {
             "label": "No plans yet",
             "detail": f"Week {week}/{year} has no finalized community plans.",
             "sharePct": 0.0,
+            "demo": False,
         }
     share = round((crop_n / total) * 100, 1)
     if share >= 25:
@@ -231,6 +286,7 @@ def planting_interest(db: Session, crop_name: str) -> dict:
         "label": label,
         "detail": f"{crop_n} of {total} recent community plans chose {crop.display_name} ({share}%).",
         "sharePct": share,
+        "demo": False,
     }
 
 
@@ -242,10 +298,96 @@ def momentum_label(change_pct: float) -> str:
     return "Stable"
 
 
-def build_crop_market_payload(db: Session, crop_name: str) -> dict:
+def _chart_rows_as_gbp(weekly: list[dict], farmer_price: dict, latest_index: float) -> list[dict]:
+    """Scale index chart into £/kg so the latest real month matches the DEFRA guide."""
+    if not farmer_price or not farmer_price.get("available") or not latest_index:
+        return weekly
+    base = float(farmer_price["gbpPerKg"])
+    ref = float(latest_index) or 1.0
+
+    # First pass: relative to latest index
+    scaled: list[dict] = []
+    last_real_gbp = None
+    for row in weekly:
+        idx = row.get("price")
+        if idx is None:
+            scaled.append(row)
+            continue
+        gbp = base * (float(idx) / ref)
+        fc = row.get("forecast")
+        fc_gbp = base * (float(fc) / ref) if fc is not None else None
+        lo = row.get("lower")
+        hi = row.get("upper")
+        item = {
+            **row,
+            "price": gbp,
+            "forecast": fc_gbp,
+            "lower": base * (float(lo) / ref) if lo is not None else None,
+            "upper": base * (float(hi) / ref) if hi is not None else None,
+            "indexPrice": round(float(idx), 1),
+        }
+        if not row.get("isForecast"):
+            last_real_gbp = gbp
+        scaled.append(item)
+
+    # Renormalise so last published month == DEFRA £/kg (avoids spike crushing the series)
+    if last_real_gbp and last_real_gbp > 0:
+        factor = base / last_real_gbp
+        for item in scaled:
+            if item.get("price") is not None:
+                item["price"] = round(float(item["price"]) * factor, 3)
+            if item.get("forecast") is not None:
+                item["forecast"] = round(float(item["forecast"]) * factor, 3)
+            if item.get("lower") is not None:
+                item["lower"] = round(float(item["lower"]) * factor, 3)
+            if item.get("upper") is not None:
+                item["upper"] = round(float(item["upper"]) * factor, 3)
+
+    # Align forecast band with the farmer "outlook in pounds" figure
+    target_fc = farmer_price.get("forecastGbpPerKg")
+    fc_vals = [
+        float(item["forecast"])
+        for item in scaled
+        if item.get("isForecast") and item.get("forecast") is not None
+    ]
+    if target_fc and fc_vals:
+        mean_fc = sum(fc_vals) / len(fc_vals)
+        if mean_fc > 0:
+            f2 = float(target_fc) / mean_fc
+            for item in scaled:
+                if not item.get("isForecast"):
+                    continue
+                if item.get("price") is not None:
+                    item["price"] = round(float(item["price"]) * f2, 3)
+                if item.get("forecast") is not None:
+                    item["forecast"] = round(float(item["forecast"]) * f2, 3)
+                if item.get("lower") is not None:
+                    item["lower"] = round(float(item["lower"]) * f2, 3)
+                if item.get("upper") is not None:
+                    item["upper"] = round(float(item["upper"]) * f2, 3)
+
+    return scaled
+
+
+def build_crop_market_payload(db: Session, crop_name: str, *, demo_data_mode: bool = False) -> dict:
+    from app.services.govuk_sync_service import maybe_refresh_govuk_indices
+
+    maybe_refresh_govuk_indices()
     series, category, proxy_note = load_crop_index_series(crop_name)
-    outlook = _forecast_tail(series, horizon=4)
-    weekly = build_market_chart(series, outlook)
+
+    # Predict enough months to bridge the publication lag (gap) + 4 forward-looking months,
+    # so the chart is continuous from the last real month through the future.
+    FORWARD_HORIZON = 4
+    if len(series):
+        last_month = _month_start(series.index[-1])
+        today_month = _month_start(pd.Timestamp.today())
+        gap_months = max(0, months_between(last_month, today_month))
+    else:
+        gap_months = 0
+    horizon = min(gap_months + FORWARD_HORIZON, 12)
+
+    outlook = _forecast_tail(series, horizon=horizon)
+    weekly, data_lag_note = build_market_chart(series, outlook)
     trend = float(outlook["change_pct"])
     current = float(outlook["latest_index"])
 
@@ -273,7 +415,7 @@ def build_crop_market_payload(db: Session, crop_name: str) -> dict:
             "Avoid selling if you can wait."
         )
 
-    planting = planting_interest(db, crop_name)
+    planting = planting_interest(db, crop_name, demo_data_mode=demo_data_mode)
     mom = momentum_label(trend)
 
     # Free public demand: Google Trends (UK) + Wikipedia pageviews fallback
@@ -305,10 +447,18 @@ def build_crop_market_payload(db: Session, crop_name: str) -> dict:
         "googleTrends": search_label,
         "googleTrendsLabel": search_card_label,
         "googleTrendsDetail": search_detail,
+        # Real district planting share (RQ3) — separate from public search signals
+        "districtShare": planting["label"],
+        "districtShareLabel": "District planting share",
+        "districtShareDetail": planting["detail"],
+        "plantingDemo": bool(planting.get("demo")),
+        # Legacy keys kept so older clients don't break
         "reddit": planting["label"],
         "redditLabel": "Farmer planting",
         "redditDetail": planting["detail"],
     }
+    if planting.get("demo"):
+        demand["demo"] = True
     if public.get("wikipedia") and public.get("trends"):
         # Extra context when both free sources available
         demand["googleTrendsDetail"] = (
@@ -321,16 +471,40 @@ def build_crop_market_payload(db: Session, crop_name: str) -> dict:
     elif public.get("wikipedia"):
         sources.append("Wikimedia pageviews (free)")
 
+    # Auto agent: save forecasts → compare when actuals arrive → walk-forward backfill
+    from app.services.forecast_validation_service import sync_forecast_ledger
+    from app.services.defra_price_service import build_farmer_price_guide
+
+    farmer_price = build_farmer_price_guide(crop_name, trend)
+    chart_unit = "gbp"
+    chart_rows = weekly
+    if farmer_price and farmer_price.get("available"):
+        chart_rows = _chart_rows_as_gbp(weekly, farmer_price, current)
+    else:
+        chart_unit = "index"
+
+    accuracy = sync_forecast_ledger(
+        crop=crop_name,
+        category=category,
+        series=series,
+        weekly_rows=weekly,  # keep index ledger for GOV.UK validation
+        outlook=outlook,
+        forecast_fn=_forecast_tail,
+    )
+
     return {
         "currentPrice": round(current, 1),
-        "priceUnit": "index",
+        "priceUnit": chart_unit,
         "trend": round(trend, 1),
         "sellVerdict": verdict,
         "sellMessage": message,
         "demand": demand,
-        "weeklyPrices": weekly,
-        "source": " · ".join(sources),
+        "weeklyPrices": chart_rows,
+        "source": " · ".join(sources + (["DEFRA AMMG £ guide"] if chart_unit == "gbp" else [])),
         "category": category,
         "proxyNote": proxy_note,
+        "dataLagNote": data_lag_note,
         "asOf": series.index[-1].strftime("%Y-%m-%d") if len(series) else None,
+        "forecastAccuracy": accuracy,
+        "farmerPrice": farmer_price,
     }

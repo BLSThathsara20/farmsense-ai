@@ -13,7 +13,33 @@ export function formatCurrency(value, currency = 'GBP') {
 /** Agricultural price index (GOV.UK) — not a currency amount. */
 export function formatPriceIndex(value, decimals = 1) {
   if (value == null || Number.isNaN(Number(value))) return '—'
-  return `${Number(value).toFixed(decimals)}` 
+  return `${Number(value).toFixed(decimals)}`
+}
+
+/** Farm-gate / wholesale guide in pounds per kilogram. */
+export function formatGbpPerKg(value) {
+  if (value == null || Number.isNaN(Number(value))) return '—'
+  return new Intl.NumberFormat('en-GB', {
+    style: 'currency',
+    currency: 'GBP',
+    minimumFractionDigits: 2,
+    maximumFractionDigits: 2,
+  }).format(Number(value))
+}
+
+/** Same guide expressed per 100g (useful for tomatoes / veg). */
+export function formatGbpPer100g(value) {
+  if (value == null || Number.isNaN(Number(value))) return '—'
+  const n = Number(value)
+  if (n < 0.1) {
+    return `${Math.round(n * 100)}p`
+  }
+  return new Intl.NumberFormat('en-GB', {
+    style: 'currency',
+    currency: 'GBP',
+    minimumFractionDigits: 2,
+    maximumFractionDigits: 2,
+  }).format(n)
 }
 
 export function formatDate(date, options = {}) {

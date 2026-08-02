@@ -3,6 +3,8 @@ from sqlalchemy.orm import Session
 
 from app.db.models import FarmProfile, RecommendationRun, SoilReading, UserAccount
 from app.services.auth_service import user_to_json
+from app.services.recommendation_service import plans_overview
+from app.services.soil_service import soil_reading_to_json
 
 
 def get_user_profile(db: Session, user: UserAccount) -> dict:
@@ -27,11 +29,18 @@ def get_user_profile(db: Session, user: UserAccount) -> dict:
                 "hasRecommendations": False,
                 "lastSoilReading": None,
                 "lastRecommendation": None,
+                "plansOverview": {
+                    "totalPlans": 0,
+                    "draftCount": 0,
+                    "finalizedCount": 0,
+                    "allSelectedCrops": [],
+                    "plans": [],
+                    "latestPlanId": None,
+                    "latestActivity": [],
+                },
                 "recentSoilDates": [],
             },
         }
-
-    from app.services.soil_service import soil_reading_to_json
 
     soil_count = (
         db.scalar(
@@ -68,6 +77,8 @@ def get_user_profile(db: Session, user: UserAccount) -> dict:
         .limit(5)
     ).all()
 
+    overview = plans_overview(db, farm)
+
     return {
         "user": user_to_json(user, farm),
         "account": account,
@@ -101,6 +112,8 @@ def get_user_profile(db: Session, user: UserAccount) -> dict:
                 "profitEstimate": float(latest_run.top_profit_estimate)
                 if latest_run.top_profit_estimate
                 else None,
+                "planId": str(latest_run.id),
+                "title": latest_run.title,
                 "planStatus": (latest_run.ranked_output or {}).get("planStatus")
                 or ("finalized" if latest_run.status.value == "completed" else "draft"),
                 "finalized": bool((latest_run.ranked_output or {}).get("finalized"))
@@ -110,6 +123,7 @@ def get_user_profile(db: Session, user: UserAccount) -> dict:
             }
             if latest_run
             else None,
+            "plansOverview": overview,
             "recentSoilDates": [r.recorded_at.isoformat() for r in recent_soil],
         },
     }

@@ -8,27 +8,38 @@ import {
   XAxis,
   YAxis,
 } from 'recharts'
-import { formatCurrency, formatPriceIndex } from '../../lib/utils'
+import { formatCurrency, formatPriceIndex, formatGbpPerKg } from '../../lib/utils'
 import { useIsMobile } from '../../hooks/useMediaQuery'
 import { cn } from '../../lib/utils'
 
-function CustomTooltip({ active, payload, label, unit }) {
+function CustomTooltip({ active, payload, label, showIndex, unit }) {
   if (!active || !payload?.length) return null
-  const fmt = unit === 'index' ? formatPriceIndex : formatCurrency
 
   return (
-    <div className="bg-surface dark:bg-surface-dark border border-border dark:border-border-dark rounded-md px-3 py-2 shadow-card text-xs sm:text-sm max-w-[200px]">
+    <div className="bg-surface dark:bg-surface-dark border border-border dark:border-border-dark rounded-md px-3 py-2 shadow-card text-xs sm:text-sm max-w-[240px]">
       <p className="font-medium text-text-primary dark:text-text-dark-primary mb-1 truncate">
         {label}
       </p>
       {payload
-        .filter((entry) => entry.value != null)
-        .map((entry) => (
-          <p key={entry.dataKey} style={{ color: entry.color }} className="font-mono text-xs">
-            {entry.name}: {fmt(entry.value)}
-            {unit === 'index' ? ' idx' : ''}
-          </p>
-        ))}
+        .filter((entry) => entry.value != null && entry.dataKey !== 'upper')
+        .map((entry) => {
+          const isIndex = String(entry.dataKey).toLowerCase().includes('index')
+          let formatted
+          if (isIndex) {
+            formatted = `${formatPriceIndex(entry.value)} idx`
+          } else if (unit === 'gbp' || showIndex) {
+            formatted = `${formatGbpPerKg(entry.value)}/kg`
+          } else if (unit === 'index') {
+            formatted = `${formatPriceIndex(entry.value)} idx`
+          } else {
+            formatted = formatCurrency(entry.value)
+          }
+          return (
+            <p key={entry.dataKey} style={{ color: entry.color }} className="font-mono text-xs">
+              {entry.name}: {formatted}
+            </p>
+          )
+        })}
     </div>
   )
 }
@@ -49,17 +60,33 @@ export function PriceChart({ data = [], className, unit = 'currency' }) {
     )
   }
 
-  const chartData = data.map((d) => ({
-    ...d,
-    history: d.isForecast ? null : d.price,
-    forecastLine: d.isForecast ? d.forecast ?? d.price : null,
-  }))
+  const showDual = unit === 'gbp' && data.some((d) => d.indexPrice != null)
+  const lastRealIdx = data.reduce((acc, d, i) => (d.isForecast ? acc : i), -1)
 
-  const chartHeight = isMobile ? 208 : 256
-  const yAxisWidth = isMobile ? 40 : 48
+  const chartData = data.map((d, i) => {
+    const gbpOrPrice = d.price
+    const idx = d.indexPrice ?? (unit === 'index' ? d.price : null)
+    return {
+      ...d,
+      history: d.isForecast ? null : gbpOrPrice,
+      forecastLine: d.isForecast
+        ? d.forecast ?? gbpOrPrice
+        : i === lastRealIdx
+          ? gbpOrPrice
+          : null,
+      indexHistory: d.isForecast ? null : idx,
+      indexForecast: d.isForecast
+        ? idx
+        : i === lastRealIdx
+          ? idx
+          : null,
+    }
+  })
+
+  const chartHeight = isMobile ? 220 : 280
+  const leftWidth = unit === 'gbp' ? (isMobile ? 48 : 58) : isMobile ? 40 : 48
+  const rightWidth = showDual ? (isMobile ? 36 : 44) : 0
   const tickSize = isMobile ? 10 : 11
-  const fmtTick = (v) =>
-    unit === 'index' ? `${Math.round(v)}` : isMobile ? `${v}` : formatCurrency(v)
 
   return (
     <div
@@ -71,7 +98,7 @@ export function PriceChart({ data = [], className, unit = 'currency' }) {
           data={chartData}
           margin={{
             top: 8,
-            right: isMobile ? 4 : 12,
+            right: showDual ? (isMobile ? 8 : 12) : isMobile ? 4 : 12,
             left: isMobile ? 0 : 4,
             bottom: isMobile ? 4 : 0,
           }}
@@ -88,53 +115,101 @@ export function PriceChart({ data = [], className, unit = 'currency' }) {
             height={isMobile ? 48 : 30}
           />
           <YAxis
-            width={yAxisWidth}
+            yAxisId="price"
+            width={leftWidth}
             tick={{ fontSize: tickSize, fill: 'var(--color-text-muted)' }}
             axisLine={false}
             tickLine={false}
-            tickFormatter={fmtTick}
+            tickFormatter={(v) =>
+              unit === 'gbp'
+                ? `£${Number(v).toFixed(2)}`
+                : unit === 'index'
+                  ? `${Math.round(v)}`
+                  : `${v}`
+            }
             domain={['auto', 'auto']}
           />
-          <Tooltip content={<CustomTooltip unit={unit} />} />
+          {showDual && (
+            <YAxis
+              yAxisId="index"
+              orientation="right"
+              width={rightWidth}
+              tick={{ fontSize: tickSize, fill: 'var(--color-text-muted)' }}
+              axisLine={false}
+              tickLine={false}
+              tickFormatter={(v) => `${Math.round(v)}`}
+              domain={['auto', 'auto']}
+            />
+          )}
+          <Tooltip
+            content={(props) => (
+              <CustomTooltip {...props} showIndex={showDual} unit={unit} />
+            )}
+          />
           <Area
+            yAxisId="price"
             type="monotone"
             dataKey="upper"
             stroke="none"
             fill="#52B788"
-            fillOpacity={0.1}
+            fillOpacity={0.12}
             connectNulls
             isAnimationActive={!isMobile}
           />
-          <Area
-            type="monotone"
-            dataKey="lower"
-            stroke="none"
-            fill="var(--color-background)"
-            fillOpacity={1}
-            connectNulls
-            isAnimationActive={false}
-          />
           <Line
+            yAxisId="price"
             type="monotone"
             dataKey="history"
-            name="Past"
+            name={unit === 'gbp' ? '£/kg (past)' : 'Past'}
             stroke="#2D6A4F"
             strokeWidth={isMobile ? 1.5 : 2}
             dot={false}
             connectNulls
             isAnimationActive={!isMobile}
+            unit={unit}
           />
           <Line
+            yAxisId="price"
             type="monotone"
             dataKey="forecastLine"
-            name="Forecast"
+            name={unit === 'gbp' ? '£/kg (forecast)' : 'Forecast'}
             stroke="#F4A261"
             strokeWidth={isMobile ? 1.5 : 2}
             strokeDasharray="6 4"
             dot={false}
             connectNulls
             isAnimationActive={!isMobile}
+            unit={unit}
           />
+          {showDual && (
+            <>
+              <Line
+                yAxisId="index"
+                type="monotone"
+                dataKey="indexHistory"
+                name="Index (past)"
+                stroke="#64748B"
+                strokeWidth={1.25}
+                strokeOpacity={0.85}
+                dot={false}
+                connectNulls
+                isAnimationActive={!isMobile}
+              />
+              <Line
+                yAxisId="index"
+                type="monotone"
+                dataKey="indexForecast"
+                name="Index (forecast)"
+                stroke="#94A3B8"
+                strokeWidth={1.25}
+                strokeDasharray="4 4"
+                strokeOpacity={0.8}
+                dot={false}
+                connectNulls
+                isAnimationActive={!isMobile}
+              />
+            </>
+          )}
         </ComposedChart>
       </ResponsiveContainer>
     </div>

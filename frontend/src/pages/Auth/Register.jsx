@@ -11,11 +11,13 @@ import { Card } from '../../components/ui/Card'
 import { Slider } from '../../components/ui/Slider'
 import { Navbar } from '../../components/layout/Navbar'
 import { LocationPicker } from '../../components/shared/LocationPicker'
+import { ServiceErrorState } from '../../components/shared/ServiceErrorState'
 import { useAuthStore } from '../../store/authStore'
 import { useFarmStore } from '../../store/farmStore'
 import { authService, getErrorMessage } from '../../api'
 import { useToast } from '../../hooks/useToast'
 import { homePathForUser, isSuperAdminEmail } from '../../lib/roles'
+import { describeServiceError, isServiceOutageError } from '../../lib/serviceError'
 
 const step1Schema = z
   .object({
@@ -42,6 +44,8 @@ export default function Register() {
   const [formData, setFormData] = useState({ farmSize: 2 })
   const [location, setLocation] = useState(null)
   const [locationError, setLocationError] = useState('')
+  const [serviceError, setServiceError] = useState(null)
+  const [retryAction, setRetryAction] = useState(null)
 
   const step1Form = useForm({
     resolver: zodResolver(step1Schema),
@@ -93,6 +97,17 @@ export default function Register() {
     navigate(home)
   }
 
+  const handleRegisterFailure = (err, retryFn) => {
+    const info = describeServiceError(err, { action: 'create your account' })
+    if (isServiceOutageError(info)) {
+      setServiceError(info)
+      setRetryAction(() => retryFn)
+      toast.error(info.title, `Contact ${info.contactEmail || 'support'} for help.`)
+      return
+    }
+    toast.error('Registration failed', getErrorMessage(err, 'Could not create your account'))
+  }
+
   const onStep1 = async (data) => {
     setFormData((prev) => ({ ...prev, ...data }))
 
@@ -106,7 +121,7 @@ export default function Register() {
         })
         await finishRegistration(user, token)
       } catch (err) {
-        toast.error('Registration failed', getErrorMessage(err, 'Could not create your account'))
+        handleRegisterFailure(err, () => onStep1(data))
       } finally {
         setLoading(false)
       }
@@ -136,7 +151,7 @@ export default function Register() {
       })
       await finishRegistration(user, token, { location })
     } catch (err) {
-      toast.error('Registration failed', getErrorMessage(err, 'Could not create your account'))
+      handleRegisterFailure(err, () => onStep2(data))
     } finally {
       setLoading(false)
     }
@@ -151,136 +166,164 @@ export default function Register() {
     <div className="min-h-dvh bg-bg dark:bg-bg-dark">
       <Navbar />
       <div className="flex items-center justify-center px-5 py-8">
-        <motion.div
-          initial={{ opacity: 0, y: 12 }}
-          animate={{ opacity: 1, y: 0 }}
-          className="w-full max-w-[400px]"
-        >
-          {!isAdminSetup && (
-            <div className="mb-6">
-              <p className="text-sm text-text-muted dark:text-text-dark-muted mb-2">
-                Step {step} of 2
-              </p>
-              <div className="h-1 rounded-full bg-surface-alt dark:bg-surface-dark-alt overflow-hidden">
-                <div
-                  className="h-full bg-primary transition-all duration-300"
-                  style={{ width: step === 1 ? '50%' : '100%' }}
-                />
-              </div>
-            </div>
-          )}
-
-          <Card variant="elevated" className="p-6 overflow-hidden">
-            <AnimatePresence mode="wait">
-              {step === 1 ? (
-                <motion.div
-                  key="step1"
-                  initial={{ opacity: 0, x: 20 }}
-                  animate={{ opacity: 1, x: 0 }}
-                  exit={{ opacity: 0, x: -20 }}
-                >
-                  <h1 className="font-display text-2xl font-semibold mb-1">
-                    {isAdminSetup ? 'Admin setup' : 'Create your account'}
-                  </h1>
-                  <p className="text-sm text-text-secondary dark:text-text-dark-secondary mb-6">
-                    {isAdminSetup
-                      ? 'Create your admin password (first time only). Later you will sign in normally.'
-                      : "Let's start with the basics"}
+        <AnimatePresence mode="wait">
+          {serviceError ? (
+            <ServiceErrorState
+              key="service-error"
+              error={serviceError}
+              onRecovered={() => {
+                setServiceError(null)
+                if (typeof retryAction === 'function') {
+                  retryAction()
+                } else {
+                  toast.info('Connection restored', 'You can continue registration.')
+                }
+              }}
+              onRetry={() => {
+                setServiceError(null)
+                if (typeof retryAction === 'function') retryAction()
+              }}
+              onBack={() => {
+                setServiceError(null)
+                setRetryAction(null)
+              }}
+              backLabel="Back to registration"
+            />
+          ) : (
+            <motion.div
+              key="register-form"
+              initial={{ opacity: 0, y: 12 }}
+              animate={{ opacity: 1, y: 0 }}
+              exit={{ opacity: 0, y: -8 }}
+              className="w-full max-w-[400px]"
+            >
+              {!isAdminSetup && (
+                <div className="mb-6">
+                  <p className="text-sm text-text-muted dark:text-text-dark-muted mb-2">
+                    Step {step} of 2
                   </p>
-                  <form onSubmit={step1Form.handleSubmit(onStep1)} className="space-y-4">
-                    <Input
-                      label="Full name"
-                      icon={User}
-                      error={step1Form.formState.errors.name?.message}
-                      {...step1Form.register('name')}
+                  <div className="h-1 rounded-full bg-surface-alt dark:bg-surface-dark-alt overflow-hidden">
+                    <div
+                      className="h-full bg-primary transition-all duration-300"
+                      style={{ width: step === 1 ? '50%' : '100%' }}
                     />
-                    <Input
-                      label="Email"
-                      type="email"
-                      icon={Mail}
-                      error={step1Form.formState.errors.email?.message}
-                      {...step1Form.register('email')}
-                    />
-                    <Input
-                      label="Password"
-                      type="password"
-                      icon={Lock}
-                      error={step1Form.formState.errors.password?.message}
-                      {...step1Form.register('password')}
-                    />
-                    <Input
-                      label="Confirm password"
-                      type="password"
-                      icon={Lock}
-                      autoComplete="new-password"
-                      error={confirmLiveError}
-                      success={confirmMatch ? 'Passwords match' : undefined}
-                      {...step1Form.register('confirmPassword')}
-                    />
-                    <Button
-                      type="submit"
-                      className="w-full"
-                      loading={loading}
-                      disabled={confirmMismatch || !step1Form.formState.isValid}
-                    >
-                      {isAdminSetup ? 'Create admin account' : 'Continue'}
-                    </Button>
-                  </form>
-                </motion.div>
-              ) : (
-                <motion.div
-                  key="step2"
-                  initial={{ opacity: 0, x: 20 }}
-                  animate={{ opacity: 1, x: 0 }}
-                  exit={{ opacity: 0, x: -20 }}
-                >
-                  <h1 className="font-display text-2xl font-semibold mb-1">About your farm</h1>
-                  <p className="text-sm text-text-secondary dark:text-text-dark-secondary mb-6">
-                    This helps us tailor recommendations to your area
-                  </p>
-                  <form onSubmit={step2Form.handleSubmit(onStep2)} className="space-y-6">
-                    <LocationPicker
-                      value={location}
-                      onChange={handleLocationChange}
-                      error={locationError}
-                    />
-                    <Slider
-                      label="Farm size (acres)"
-                      min={0.5}
-                      max={50}
-                      step={0.5}
-                      value={step2Form.watch('farmSize') || 2}
-                      onChange={(v) => step2Form.setValue('farmSize', v)}
-                      formatValue={(v) => `${v} ac`}
-                    />
-                    <div className="flex gap-3">
-                      <Button
-                        type="button"
-                        variant="secondary"
-                        className="flex-1"
-                        onClick={() => setStep(1)}
-                      >
-                        Back
-                      </Button>
-                      <Button type="submit" loading={loading} className="flex-1">
-                        Get started
-                      </Button>
-                    </div>
-                  </form>
-                </motion.div>
+                  </div>
+                </div>
               )}
-            </AnimatePresence>
 
-            <p className="text-center text-sm mt-6">
-              <span className="text-text-secondary dark:text-text-dark-secondary">
-                Already have an account?{' '}
-              </span>
-              <Link to="/login" className="text-primary font-medium hover:underline">
-                Sign in
-              </Link>
-            </p>
-          </Card>
-        </motion.div>
+              <Card variant="elevated" className="p-6 overflow-hidden">
+                <AnimatePresence mode="wait">
+                  {step === 1 ? (
+                    <motion.div
+                      key="step1"
+                      initial={{ opacity: 0, x: 20 }}
+                      animate={{ opacity: 1, x: 0 }}
+                      exit={{ opacity: 0, x: -20 }}
+                    >
+                      <h1 className="font-display text-2xl font-semibold mb-1">
+                        {isAdminSetup ? 'Admin setup' : 'Create your account'}
+                      </h1>
+                      <p className="text-sm text-text-secondary dark:text-text-dark-secondary mb-6">
+                        {isAdminSetup
+                          ? 'Create your admin password (first time only). Later you will sign in normally.'
+                          : "Let's start with the basics"}
+                      </p>
+                      <form onSubmit={step1Form.handleSubmit(onStep1)} className="space-y-4">
+                        <Input
+                          label="Full name"
+                          icon={User}
+                          error={step1Form.formState.errors.name?.message}
+                          {...step1Form.register('name')}
+                        />
+                        <Input
+                          label="Email"
+                          type="email"
+                          icon={Mail}
+                          error={step1Form.formState.errors.email?.message}
+                          {...step1Form.register('email')}
+                        />
+                        <Input
+                          label="Password"
+                          type="password"
+                          icon={Lock}
+                          error={step1Form.formState.errors.password?.message}
+                          {...step1Form.register('password')}
+                        />
+                        <Input
+                          label="Confirm password"
+                          type="password"
+                          icon={Lock}
+                          autoComplete="new-password"
+                          error={confirmLiveError}
+                          success={confirmMatch ? 'Passwords match' : undefined}
+                          {...step1Form.register('confirmPassword')}
+                        />
+                        <Button
+                          type="submit"
+                          className="w-full"
+                          loading={loading}
+                          disabled={confirmMismatch || !step1Form.formState.isValid}
+                        >
+                          {isAdminSetup ? 'Create admin account' : 'Continue'}
+                        </Button>
+                      </form>
+                    </motion.div>
+                  ) : (
+                    <motion.div
+                      key="step2"
+                      initial={{ opacity: 0, x: 20 }}
+                      animate={{ opacity: 1, x: 0 }}
+                      exit={{ opacity: 0, x: -20 }}
+                    >
+                      <h1 className="font-display text-2xl font-semibold mb-1">About your farm</h1>
+                      <p className="text-sm text-text-secondary dark:text-text-dark-secondary mb-6">
+                        This helps us tailor recommendations to your area
+                      </p>
+                      <form onSubmit={step2Form.handleSubmit(onStep2)} className="space-y-6">
+                        <LocationPicker
+                          value={location}
+                          onChange={handleLocationChange}
+                          error={locationError}
+                        />
+                        <Slider
+                          label="Farm size (acres)"
+                          min={0.5}
+                          max={50}
+                          step={0.5}
+                          value={step2Form.watch('farmSize') || 2}
+                          onChange={(v) => step2Form.setValue('farmSize', v)}
+                          formatValue={(v) => `${v} ac`}
+                        />
+                        <div className="flex gap-3">
+                          <Button
+                            type="button"
+                            variant="secondary"
+                            className="flex-1"
+                            onClick={() => setStep(1)}
+                          >
+                            Back
+                          </Button>
+                          <Button type="submit" loading={loading} className="flex-1">
+                            Get started
+                          </Button>
+                        </div>
+                      </form>
+                    </motion.div>
+                  )}
+                </AnimatePresence>
+
+                <p className="text-center text-sm mt-6">
+                  <span className="text-text-secondary dark:text-text-dark-secondary">
+                    Already have an account?{' '}
+                  </span>
+                  <Link to="/login" className="text-primary font-medium hover:underline">
+                    Sign in
+                  </Link>
+                </p>
+              </Card>
+            </motion.div>
+          )}
+        </AnimatePresence>
       </div>
     </div>
   )

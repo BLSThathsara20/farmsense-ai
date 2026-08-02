@@ -207,6 +207,28 @@ def forecast_price_outlook(horizon_weeks: int = 4) -> dict:
 
 def forecast_crop_price_outlook(crop: str, horizon_weeks: int = 4) -> dict:
     """Prefer GOV.UK crop-specific index; fall back to generic LSTM series."""
+
+    def _farmer_price_detail(crop_name, outlook, change_pct, direction, spike_note, category, note):
+        try:
+            from app.services.defra_price_service import build_farmer_price_guide
+
+            guide = build_farmer_price_guide(crop_name, change_pct)
+            if guide and guide.get("available"):
+                return (
+                    f"About £{guide['gbpPerKg']:.2f}/kg now "
+                    f"(~£{guide['gbpPer100g']:.2f} per 100g). "
+                    f"Outlook ~£{guide['forecastGbpPerKg']:.2f}/kg "
+                    f"({change_pct:+.1f}%, {direction}). "
+                    f"Farm-gate guide from DEFRA — not supermarket shelf price."
+                    f"{spike_note}"
+                )
+        except Exception:
+            pass
+        return (
+            f"Market outlook {change_pct:+.1f}% ({direction}) on the UK "
+            f"{category.replace('_', ' ')} index.{spike_note}"
+        )
+
     try:
         from app.services.market_data_service import _forecast_tail, load_crop_index_series
 
@@ -232,11 +254,7 @@ def forecast_crop_price_outlook(crop: str, horizon_weeks: int = 4) -> dict:
             "category": category,
             "proxyNote": note,
             "spikeDamped": bool(outlook.get("spike_damped")),
-            "detail": (
-                f"GOV.UK {category.replace('_', ' ')} index "
-                f"{outlook['latest_index']:.1f} → ~{outlook['forecast_mean']:.1f} "
-                f"({change_pct:+.1f}%, {direction}).{spike_note}"
-            ),
+            "detail": _farmer_price_detail(crop, outlook, change_pct, direction, spike_note, category, note),
             "source": f"GOV.UK agricultural price indices · {category}",
             "method": outlook.get("method") or "l3_govuk_crop_index",
         }
@@ -449,7 +467,7 @@ def score_demand_outlook(
 ) -> dict:
     risk = float(oversupply_risk)
     score = int(min(96, max(40, round(88 - risk * 55))))
-    sources = ["district planting pressure"]
+    sources = ["district planting aggregates"]
     if district_plan_share is not None:
         score = int(min(96, max(40, round(90 - district_plan_share * 0.7))))
         detail = (
@@ -457,7 +475,7 @@ def score_demand_outlook(
             f"oversupply risk {risk:.0%}."
         )
     else:
-        detail = f"District planting pressure implies oversupply risk ~{risk:.0%}."
+        detail = f"Fallback community-pressure estimate implies oversupply risk ~{risk:.0%}."
 
     if search_change_pct is not None:
         boost = int(max(-8, min(8, round(search_change_pct / 3))))

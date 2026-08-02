@@ -2,9 +2,65 @@ import { lazy, Suspense } from 'react'
 import { createBrowserRouter, Navigate } from 'react-router-dom'
 import { AppShell } from '../components/layout/AppShell'
 import { Spinner } from '../components/ui/Modal'
+import { ServiceErrorState } from '../components/shared/ServiceErrorState'
+import { Navbar } from '../components/layout/Navbar'
 import { useAuthStore } from '../store/authStore'
 import { useSyncProfile } from '../hooks/useSyncProfile'
 import { homePathForUser, isAdminUser } from '../lib/roles'
+
+function AuthBootLoader() {
+  return (
+    <div className="flex items-center justify-center min-h-[50vh]">
+      <Spinner size="lg" />
+    </div>
+  )
+}
+
+function SessionOutagePage({ error }) {
+  const setSessionError = useAuthStore((s) => s.setSessionError)
+  return (
+    <div className="min-h-dvh bg-bg dark:bg-bg-dark">
+      <Navbar />
+      <div className="flex items-center justify-center px-5 py-12">
+        <ServiceErrorState
+          error={error}
+          onRecovered={() => {
+            setSessionError(null)
+            useAuthStore.setState({ sessionStatus: 'idle' })
+            window.location.assign('/login')
+          }}
+          onRetry={() => {
+            setSessionError(null)
+            useAuthStore.setState({ sessionStatus: 'idle' })
+            window.location.assign('/login')
+          }}
+          onBack={() => {
+            setSessionError(null)
+            window.location.assign('/login')
+          }}
+          backLabel="Go to sign in"
+        />
+      </div>
+    </div>
+  )
+}
+
+/** Wait for localStorage hydrate + /auth/me (or clear stale session). */
+function useVerifiedSession() {
+  const hasHydrated = useAuthStore((s) => s.hasHydrated)
+  const sessionStatus = useAuthStore((s) => s.sessionStatus)
+  const sessionError = useAuthStore((s) => s.sessionError)
+  const user = useAuthStore((s) => s.user)
+  const ready = hasHydrated && sessionStatus !== 'idle' && sessionStatus !== 'checking'
+  return {
+    ready,
+    hasHydrated,
+    sessionStatus,
+    sessionError,
+    isAuthenticated: sessionStatus === 'authenticated',
+    user,
+  }
+}
 
 const Landing = lazy(() => import('../pages/Landing'))
 const Login = lazy(() => import('../pages/Auth/Login'))
@@ -13,7 +69,11 @@ const ForgotPassword = lazy(() => import('../pages/Auth/ForgotPassword'))
 const ResetPassword = lazy(() => import('../pages/Auth/ResetPassword'))
 const Dashboard = lazy(() => import('../pages/Dashboard'))
 const SoilInput = lazy(() => import('../pages/SoilInput'))
+const PlansList = lazy(() => import('../pages/PlansList'))
 const Recommendations = lazy(() => import('../pages/Recommendations'))
+const RecommendationsRedirect = lazy(() =>
+  import('../pages/Recommendations').then((m) => ({ default: m.RecommendationsRedirect }))
+)
 const Market = lazy(() => import('../pages/Market'))
 const Community = lazy(() => import('../pages/Community'))
 const Settings = lazy(() => import('../pages/Settings'))
@@ -38,9 +98,12 @@ function LazyPage({ children }) {
 
 /** Farmer app routes — admins are redirected to /admin */
 function ProtectedRoute({ children }) {
-  const isAuthenticated = useAuthStore((s) => s.isAuthenticated)
-  const user = useAuthStore((s) => s.user)
+  const { ready, isAuthenticated, user, sessionError } = useVerifiedSession()
   useSyncProfile()
+  if (sessionError && !isAuthenticated) {
+    return <SessionOutagePage error={sessionError} />
+  }
+  if (!ready) return <AuthBootLoader />
   if (!isAuthenticated) return <Navigate to="/login" replace />
   if (isAdminUser(user)) return <Navigate to="/admin" replace />
   return children
@@ -48,16 +111,24 @@ function ProtectedRoute({ children }) {
 
 /** Super-admin routes — farmers redirected to farmer dashboard */
 function AdminRoute({ children }) {
-  const isAuthenticated = useAuthStore((s) => s.isAuthenticated)
-  const user = useAuthStore((s) => s.user)
+  const { ready, isAuthenticated, user, sessionError } = useVerifiedSession()
+  if (sessionError && !isAuthenticated) {
+    return <SessionOutagePage error={sessionError} />
+  }
+  if (!ready) return <AuthBootLoader />
   if (!isAuthenticated) return <Navigate to="/login" replace />
   if (!isAdminUser(user)) return <Navigate to="/dashboard" replace />
   return children
 }
 
+/**
+ * Login / register: never wait on the API — only localStorage hydrate.
+ * Outage details are shown inside Login via sessionError.
+ */
 function PublicOnlyRoute({ children }) {
-  const isAuthenticated = useAuthStore((s) => s.isAuthenticated)
-  const user = useAuthStore((s) => s.user)
+  const { hasHydrated, isAuthenticated, user } = useVerifiedSession()
+
+  if (!hasHydrated) return <AuthBootLoader />
   if (isAuthenticated) return <Navigate to={homePathForUser(user)} replace />
   return children
 }
@@ -123,6 +194,16 @@ export const router = createBrowserRouter([
         ),
       },
       {
+        path: '/plans',
+        element: (
+          <LazyPage>
+            <ProtectedRoute>
+              <PlansList />
+            </ProtectedRoute>
+          </LazyPage>
+        ),
+      },
+      {
         path: '/plan',
         element: (
           <LazyPage>
@@ -133,11 +214,21 @@ export const router = createBrowserRouter([
         ),
       },
       {
-        path: '/recommendations',
+        path: '/plans/:planId',
         element: (
           <LazyPage>
             <ProtectedRoute>
               <Recommendations />
+            </ProtectedRoute>
+          </LazyPage>
+        ),
+      },
+      {
+        path: '/recommendations',
+        element: (
+          <LazyPage>
+            <ProtectedRoute>
+              <RecommendationsRedirect />
             </ProtectedRoute>
           </LazyPage>
         ),

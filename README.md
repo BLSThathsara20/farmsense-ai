@@ -18,13 +18,13 @@ farmsense-ai/
 └── docker-compose.yml Postgres + API containers
 ```
 
-| Layer | Tech |
-|-------|------|
+| Layer    | Tech                                                                     |
+| -------- | ------------------------------------------------------------------------ |
 | Frontend | React 18, Vite, Tailwind, Zustand, React Router, Recharts, Framer Motion |
-| Backend | FastAPI, SQLAlchemy, JWT, bcrypt, SlowAPI rate limits |
-| Database | PostgreSQL 16 |
-| ML | scikit-learn Random Forest (`rf_suitability.pkl`) |
-| Email | Resend (free tier) for forgot-password |
+| Backend  | FastAPI, SQLAlchemy, JWT, bcrypt, SlowAPI rate limits                    |
+| Database | PostgreSQL 16                                                            |
+| ML       | scikit-learn Random Forest (`rf_suitability.pkl`)                        |
+| Email    | Resend (free tier) for forgot-password                                   |
 
 Frontend talks to the backend when `VITE_USE_MOCK_API=false` (default in `.env.example`).
 
@@ -49,10 +49,10 @@ docker compose up -d --build
 
 This starts:
 
-| Service | Host port | URL |
-|---------|-----------|-----|
-| PostgreSQL | **5433** | `localhost:5433` |
-| FastAPI | **8000** | http://localhost:8000 |
+| Service    | Host port | URL                   |
+| ---------- | --------- | --------------------- |
+| PostgreSQL | **5433**  | `localhost:5433`      |
+| FastAPI    | **8000**  | http://localhost:8000 |
 
 Check health:
 
@@ -84,10 +84,10 @@ VITE_USE_MOCK_API=false
 
 ### 3. Try the full flow
 
-1. **Register** a new account  
-2. **Plan** → submit soil (N, P, K, pH)  
-3. View **Recommendations** / **Dashboard**  
-4. **Settings** → System status (API, DB, ML) + Saved data counts  
+1. **Register** a new account
+2. **Plan** → submit soil (N, P, K, pH)
+3. View **Recommendations** / **Dashboard**
+4. **Settings** → System status (API, DB, ML) + Saved data counts
 5. Sign out → sign in again → data is still there (PostgreSQL)
 
 ---
@@ -180,20 +180,20 @@ pytest tests/ -v
 
 ## Main API routes
 
-| Method | Path | Auth | Purpose |
-|--------|------|------|---------|
-| GET | `/health` | No | Liveness |
-| GET | `/health/ready` | No | DB + ML ready |
-| POST | `/auth/register` | No | Create account |
-| POST | `/auth/login` | No | JWT login |
-| POST | `/auth/forgot-password` | No | Email / reset link |
-| POST | `/auth/reset-password` | No | Set new password |
-| GET | `/auth/me` | Yes | Profile + saved counts |
-| POST | `/soil` | Yes | Save soil + run ML |
-| GET | `/dashboard` | Yes | Farmer dashboard |
-| GET | `/recommendations` | Yes | Latest crop plan |
-| GET | `/market` | No | Market snapshot |
-| GET | `/community` | Yes | District aggregates |
+| Method | Path                    | Auth | Purpose                |
+| ------ | ----------------------- | ---- | ---------------------- |
+| GET    | `/health`               | No   | Liveness               |
+| GET    | `/health/ready`         | No   | DB + ML ready          |
+| POST   | `/auth/register`        | No   | Create account         |
+| POST   | `/auth/login`           | No   | JWT login              |
+| POST   | `/auth/forgot-password` | No   | Email / reset link     |
+| POST   | `/auth/reset-password`  | No   | Set new password       |
+| GET    | `/auth/me`              | Yes  | Profile + saved counts |
+| POST   | `/soil`                 | Yes  | Save soil + run ML     |
+| GET    | `/dashboard`            | Yes  | Farmer dashboard       |
+| GET    | `/recommendations`      | Yes  | Latest crop plan       |
+| GET    | `/market`               | No   | Market snapshot        |
+| GET    | `/community`            | Yes  | District aggregates    |
 
 ---
 
@@ -210,14 +210,14 @@ npm run preview   # preview build
 
 ## Troubleshooting
 
-| Problem | Fix |
-|---------|-----|
-| Frontend shows mock / empty data | Set `VITE_USE_MOCK_API=false`, restart `npm run dev` |
-| `/auth/me` 404 | Rebuild API: `docker compose up -d --build backend` |
-| Port 5432 in use | Compose uses **5433** on purpose |
-| Login “No account found” | Register that email first |
-| ML not ready | Ensure `ml-models/artifacts/rf_suitability.pkl` exists and is mounted |
-| CORS errors | Backend `CORS_ORIGINS` must include `http://localhost:5173` |
+| Problem                          | Fix                                                                   |
+| -------------------------------- | --------------------------------------------------------------------- |
+| Frontend shows mock / empty data | Set `VITE_USE_MOCK_API=false`, restart `npm run dev`                  |
+| `/auth/me` 404                   | Rebuild API: `docker compose up -d --build backend`                   |
+| Port 5432 in use                 | Compose uses **5433** on purpose                                      |
+| Login “No account found”         | Register that email first                                             |
+| ML not ready                     | Ensure `ml-models/artifacts/rf_suitability.pkl` exists and is mounted |
+| CORS errors                      | Backend `CORS_ORIGINS` must include `http://localhost:5173`           |
 
 ---
 

@@ -39,7 +39,8 @@ services:
       ML_HEAVY: "true"
       FRONTEND_URL: http://localhost:5173
     volumes:
-      - ./ml-models/artifacts:/app/ml-models/artifacts:ro
+      # rw so GOV.UK index refresh can update the local CSV when Defra publishes newer months
+      - ./ml-models/artifacts:/app/ml-models/artifacts
     depends_on:
       db:
         condition: service_healthy

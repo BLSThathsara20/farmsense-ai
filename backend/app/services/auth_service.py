@@ -113,4 +113,26 @@ def user_to_json(user: UserAccount, farm: FarmProfile | None) -> dict:
         "district": farm.district_name if farm else None,
         "countryCode": farm.country_code if farm else None,
         "location": location,
+        "simpleMode": bool(getattr(user, "simple_mode", False)),
+        "demoDataMode": bool(getattr(user, "demo_data_mode", False)),
     }
+
+
+def update_user_preferences(
+    db: Session,
+    user: UserAccount,
+    *,
+    simple_mode: bool | None = None,
+    demo_data_mode: bool | None = None,
+) -> tuple[UserAccount, FarmProfile | None]:
+    if simple_mode is not None:
+        user.simple_mode = bool(simple_mode)
+    if demo_data_mode is not None:
+        user.demo_data_mode = bool(demo_data_mode)
+    db.add(user)
+    db.flush()
+    farm = db.scalar(select(FarmProfile).where(FarmProfile.user_id == user.id).limit(1))
+    db.commit()
+    db.refresh(user)
+    return user, farm
+

@@ -9,7 +9,9 @@ import { WeeklyPriceList } from '../components/shared/WeeklyPriceList'
 import { PriceChart } from '../components/charts/PriceChart'
 import { useMarketData, useCrops } from '../hooks/useMockData'
 import { useFarmStore } from '../store/farmStore'
-import { formatPriceIndex, formatPercent } from '../lib/utils'
+import { apiConfig } from '../api'
+import { DemoTag } from '../components/shared/DemoTag'
+import { formatPercent, formatGbpPerKg, formatGbpPer100g } from '../lib/utils'
 import { cn } from '../lib/utils'
 
 const verdictConfig = {
@@ -40,23 +42,31 @@ export default function Market() {
   const { crops: allCrops, loading: cropsLoading } = useCrops()
   const selectedCrops = useFarmStore((s) => s.selectedCrops)
   const cropPlanConfirmedAt = useFarmStore((s) => s.cropPlanConfirmedAt)
+  const overviewCrops = useFarmStore((s) => s.plansOverview?.allSelectedCrops || [])
+
+  const farmCropNames = useMemo(() => {
+    const fromActive = selectedCrops.map((c) => c.crop).filter(Boolean)
+    const fromAll = overviewCrops.map((c) => c.crop).filter(Boolean)
+    return [...new Set([...fromActive, ...fromAll])]
+  }, [selectedCrops, overviewCrops])
 
   const cropList = useMemo(() => {
-    const planted = selectedCrops.map((c) => c.crop)
-    const rest = allCrops.filter((c) => !planted.includes(c))
-    return [...planted, ...rest]
-  }, [allCrops, selectedCrops])
+    const rest = allCrops.filter((c) => !farmCropNames.includes(c))
+    return [...farmCropNames, ...rest]
+  }, [allCrops, farmCropNames])
 
-  const defaultCrop = selectedCrops[0]?.crop || allCrops[0] || 'Tomato'
+  const defaultCrop = farmCropNames[0] || allCrops[0] || 'Tomato'
   const [selectedCrop, setSelectedCrop] = useState(defaultCrop)
 
+  // Keep selection valid when the crop list changes — do not force back to default on every click.
   useEffect(() => {
-    if (cropList.includes(defaultCrop)) {
-      setSelectedCrop(defaultCrop)
-    } else if (cropList.length && !cropList.includes(selectedCrop)) {
-      setSelectedCrop(cropList[0])
-    }
-  }, [defaultCrop, cropList, selectedCrop])
+    if (!cropList.length) return
+    setSelectedCrop((current) => {
+      if (cropList.includes(current)) return current
+      if (cropList.includes(defaultCrop)) return defaultCrop
+      return cropList[0]
+    })
+  }, [cropList, defaultCrop])
 
   const { loading, error, retry, data } = useMarketData(selectedCrop)
 
@@ -71,32 +81,43 @@ export default function Market() {
   const verdict = data ? verdictConfig[data.sellVerdict] || verdictConfig.wait : verdictConfig.wait
   const weeklyRows = data?.weeklyPrices?.slice(-8) ?? []
   const pageLoading = loading || cropsLoading || !data
-  const priceUnit = data?.priceUnit === 'index' ? 'index' : 'currency'
+  const priceUnit = data?.priceUnit === 'gbp' ? 'gbp' : data?.priceUnit === 'index' ? 'index' : 'currency'
+  const chartTitle =
+    priceUnit === 'gbp' ? 'Price (£/kg) and UK index' : 'Price index trend'
+  const monthListTitle =
+    priceUnit === 'gbp' ? 'Month by month (£/kg + index)' : 'Month by month'
 
   return (
     <PageWrapper className="market-page">
       <header className="mb-4 sm:mb-5">
-        <p className="text-xs sm:text-sm text-text-secondary dark:text-text-dark-secondary mb-1">
-          Market check
-        </p>
+        <div className="flex items-center gap-2 mb-1">
+          <p className="text-xs sm:text-sm text-text-secondary dark:text-text-dark-secondary">
+            Market check
+          </p>
+          {(apiConfig.useMock || data?.demand?.plantingDemo || data?.demand?.demo) && <DemoTag />}
+        </div>
         <h1 className="font-display text-xl sm:text-2xl lg:text-3xl text-text-primary dark:text-text-dark-primary leading-tight">
           Is now a good time to sell?
         </h1>
-        <p className="mt-1.5 text-xs text-text-muted dark:text-text-dark-muted">
-          UK agricultural price indices (GOV.UK) — per crop where published.
+        <p className="mt-1.5 text-xs text-text-muted dark:text-text-dark-muted" data-detail>
+          Farm-gate guide in £/kg (DEFRA) plus GOV.UK index outlook — not supermarket shelf prices.
         </p>
       </header>
 
       <div className="market-chip-scroll mb-4 sm:mb-5">
-        {cropPlanConfirmedAt && selectedCrops.length > 0 && (
-          <p className="text-xs text-text-muted dark:text-text-dark-muted mb-2 flex items-center gap-1 px-0.5">
+        {farmCropNames.length > 0 && (
+          <p
+            className="text-xs text-text-muted dark:text-text-dark-muted mb-2 flex items-center gap-1 px-0.5"
+            data-detail
+          >
             <Sprout className="h-3.5 w-3.5 text-primary shrink-0" />
-            Your crops shown first
+            Your plan crops shown first
+            {cropPlanConfirmedAt ? ' (active plan)' : ''}
           </p>
         )}
         <div className="market-chip-track" role="tablist" aria-label="Select crop">
           {cropList.map((crop) => {
-            const isYours = selectedCrops.some((c) => c.crop === crop)
+            const isYours = farmCropNames.includes(crop)
             const isActive = selectedCrop === crop
             return (
               <button
@@ -151,7 +172,14 @@ export default function Market() {
                   {data.sellMessage}
                 </p>
                 {data.proxyNote && (
-                  <p className="text-xs text-text-muted mt-2">{data.proxyNote}</p>
+                  <p className="text-xs text-text-muted mt-2" data-detail>
+                    {data.proxyNote}
+                  </p>
+                )}
+                {data.dataLagNote && (
+                  <p className="text-xs text-accent mt-2" data-detail>
+                    {data.dataLagNote}
+                  </p>
                 )}
               </div>
             </div>
@@ -159,47 +187,130 @@ export default function Market() {
 
           <div className="min-w-0">
             <p className="text-[10px] sm:text-xs font-mono uppercase tracking-widest text-text-muted dark:text-text-dark-muted mb-1 truncate">
-              {selectedCrop} · UK price index
-              {data.asOf ? ` · as of ${data.asOf}` : ''}
+              {selectedCrop} · guide price for farmers
+              {data.farmerPrice?.asOf ? ` · DEFRA as of ${data.farmerPrice.asOf}` : ''}
             </p>
-            <div className="flex flex-col xs:flex-row xs:items-end xs:gap-3 gap-2">
-              <span className="font-mono text-3xl sm:text-4xl lg:text-5xl font-medium text-text-primary dark:text-text-dark-primary leading-none">
-                {formatPriceIndex(data.currentPrice)}
-                <span className="text-base font-normal text-text-muted ml-1.5">idx</span>
-              </span>
-              <span
-                className={cn(
-                  'inline-flex items-center self-start xs:self-auto gap-1 font-mono text-xs sm:text-sm px-2.5 py-1 rounded-full',
-                  data.trend >= 0 ? 'bg-success/10 text-success' : 'bg-error/10 text-error'
-                )}
-              >
-                {data.trend >= 0 ? (
-                  <TrendingUp className="h-3.5 w-3.5 shrink-0" />
-                ) : (
-                  <TrendingDown className="h-3.5 w-3.5 shrink-0" />
-                )}
-                {formatPercent(data.trend)} outlook
-              </span>
-            </div>
+
+            {data.farmerPrice?.available ? (
+              <div className="space-y-3 mb-5">
+                <div className="flex flex-col xs:flex-row xs:items-end xs:gap-4 gap-2">
+                  <div>
+                    <span className="font-mono text-3xl sm:text-4xl lg:text-5xl font-medium text-text-primary dark:text-text-dark-primary leading-none">
+                      {formatGbpPerKg(data.farmerPrice.gbpPerKg)}
+                    </span>
+                    <span className="text-base font-normal text-text-muted ml-1.5">/ kg</span>
+                  </div>
+                  <div className="flex flex-wrap items-center gap-2 text-sm text-text-secondary dark:text-text-dark-secondary">
+                    <span>
+                      <span className="ek-mono-data">
+                        {formatGbpPer100g(data.farmerPrice.gbpPer100g)}
+                      </span>
+                      <span className="text-text-muted ml-1">per 100g</span>
+                    </span>
+                    <span
+                      className={cn(
+                        'inline-flex items-center gap-1 font-mono text-xs sm:text-sm px-2.5 py-1 rounded-full',
+                        data.trend >= 0 ? 'bg-success/10 text-success' : 'bg-error/10 text-error'
+                      )}
+                    >
+                      {data.trend >= 0 ? (
+                        <TrendingUp className="h-3.5 w-3.5 shrink-0" />
+                      ) : (
+                        <TrendingDown className="h-3.5 w-3.5 shrink-0" />
+                      )}
+                      {formatPercent(data.trend)} outlook
+                    </span>
+                  </div>
+                </div>
+
+                <div
+                  className="rounded-lg border border-border dark:border-border-dark bg-surface-alt/60 dark:bg-surface-dark-alt/60 px-3.5 py-3"
+                  data-detail
+                >
+                  <p className="ek-label mb-1">Outlook in pounds</p>
+                  <p className="text-sm text-text-primary dark:text-text-dark-primary">
+                    About{' '}
+                    <span className="ek-mono-data font-semibold">
+                      {formatGbpPerKg(data.farmerPrice.forecastGbpPerKg)}/kg
+                    </span>
+                    <span className="text-text-muted">
+                      {' '}
+                      ({formatGbpPer100g(data.farmerPrice.forecastGbpPer100g)} / 100g)
+                    </span>
+                    <span className="text-text-secondary">
+                      {' '}
+                      if the market moves with the outlook ({formatPercent(data.trend)}).
+                    </span>
+                  </p>
+                  {data.farmerPrice.proxyNote && (
+                    <p className="text-[11px] text-text-muted mt-1.5">{data.farmerPrice.proxyNote}</p>
+                  )}
+                  <p className="text-[11px] text-text-muted mt-1">
+                    Source · {data.farmerPrice.source}. Guide only — not a supermarket till receipt.
+                  </p>
+                </div>
+              </div>
+            ) : (
+              <div className="mb-5 space-y-2">
+                <p className="text-sm text-text-muted">
+                  {data.farmerPrice?.reason ||
+                    'No DEFRA £/kg series for this crop yet. Price outlook still available on the chart.'}
+                </p>
+                <span
+                  className={cn(
+                    'inline-flex items-center gap-1 font-mono text-xs sm:text-sm px-2.5 py-1 rounded-full',
+                    data.trend >= 0 ? 'bg-success/10 text-success' : 'bg-error/10 text-error'
+                  )}
+                >
+                  {data.trend >= 0 ? (
+                    <TrendingUp className="h-3.5 w-3.5 shrink-0" />
+                  ) : (
+                    <TrendingDown className="h-3.5 w-3.5 shrink-0" />
+                  )}
+                  {formatPercent(data.trend)} outlook
+                </span>
+              </div>
+            )}
           </div>
 
           <Card variant="elevated" className="!p-3 sm:!p-4 min-w-0 overflow-hidden">
             <h2 className="text-xs sm:text-sm font-medium text-text-secondary dark:text-text-dark-secondary mb-2 sm:mb-3">
-              Price index trend
+              {chartTitle}
             </h2>
             {data.weeklyPrices?.length > 0 ? (
               <>
                 <PriceChart data={data.weeklyPrices} unit={priceUnit} />
-                <div className="flex flex-wrap gap-x-4 gap-y-1 mt-2 sm:mt-3 text-[10px] sm:text-xs text-text-muted dark:text-text-dark-muted">
+                <div className="flex flex-wrap gap-x-4 gap-y-1 mt-2 sm:mt-3 text-[10px] sm:text-xs text-text-muted dark:text-text-dark-muted" data-detail>
                   <span className="flex items-center gap-1.5">
                     <span className="w-4 sm:w-5 h-0.5 bg-primary rounded shrink-0" />
-                    Past
+                    £/kg past
                   </span>
                   <span className="flex items-center gap-1.5">
                     <span className="w-4 sm:w-5 h-0.5 bg-accent rounded shrink-0 opacity-80" />
-                    Forecast
+                    £/kg forecast
                   </span>
+                  {priceUnit === 'gbp' && (
+                    <>
+                      <span className="flex items-center gap-1.5">
+                        <span className="w-4 sm:w-5 h-0.5 bg-slate-500 rounded shrink-0" />
+                        Index past
+                      </span>
+                      <span className="flex items-center gap-1.5">
+                        <span
+                          className="w-4 sm:w-5 h-0.5 bg-slate-400 rounded shrink-0 opacity-80"
+                          style={{ backgroundImage: 'repeating-linear-gradient(90deg,#94a3b8 0 3px,transparent 3px 6px)' }}
+                        />
+                        Index forecast
+                      </span>
+                    </>
+                  )}
                 </div>
+                {priceUnit === 'gbp' && (
+                  <p className="text-[11px] text-text-muted mt-2" data-detail>
+                    Left axis: estimated £/kg for farmers. Right axis: GOV.UK index (not pounds).
+                    £ values use DEFRA guide + index shape — not supermarket prices.
+                  </p>
+                )}
               </>
             ) : (
               <EmptyState
@@ -209,19 +320,81 @@ export default function Market() {
             )}
           </Card>
 
+          {data.forecastAccuracy &&
+            (data.forecastAccuracy.comparedCount > 0 || data.forecastAccuracy.pendingCount > 0) && (
+              <Card variant="bordered" className="!p-3 sm:!p-4 min-w-0" data-detail>
+                <h2 className="text-xs sm:text-sm font-medium text-text-secondary dark:text-text-dark-secondary mb-1">
+                  Forecast check (auto)
+                </h2>
+                <p className="text-[11px] text-text-muted dark:text-text-dark-muted mb-3">
+                  We save each prediction, then compare it to the GOV.UK actual when that month is
+                  published. No manual step.
+                </p>
+                {data.forecastAccuracy.avgMapePct != null && (
+                  <p className="ek-mono-data text-sm text-text-primary dark:text-text-dark-primary mb-3">
+                    Avg error on checked months:{' '}
+                    <span className="font-semibold">{data.forecastAccuracy.avgMapePct}% MAPE</span>
+                    <span className="text-text-muted text-xs ml-1">
+                      ({data.forecastAccuracy.comparedCount} months)
+                    </span>
+                  </p>
+                )}
+                {data.forecastAccuracy.recent?.length > 0 && (
+                  <ul className="space-y-1.5 mb-3">
+                    {data.forecastAccuracy.recent.slice(0, 4).map((row) => (
+                      <li
+                        key={`${row.month}-${row.predicted}`}
+                        className="flex flex-wrap items-baseline justify-between gap-x-3 gap-y-0.5 text-xs"
+                      >
+                        <span className="ek-mono-data text-text-secondary">{row.month}</span>
+                        <span className="text-text-muted">
+                          pred {row.predicted} → actual {row.actual}
+                          {row.mapePct != null && (
+                            <span
+                              className={cn(
+                                'ml-1.5 font-medium',
+                                row.mapePct <= 10
+                                  ? 'text-success'
+                                  : row.mapePct <= 20
+                                    ? 'text-accent'
+                                    : 'text-error'
+                              )}
+                            >
+                              {row.mapePct}% err
+                            </span>
+                          )}
+                        </span>
+                      </li>
+                    ))}
+                  </ul>
+                )}
+                {data.forecastAccuracy.pendingCount > 0 && (
+                  <p className="text-[11px] text-accent">
+                    {data.forecastAccuracy.pendingCount} month
+                    {data.forecastAccuracy.pendingCount === 1 ? '' : 's'} saved and waiting for Defra
+                    publish
+                    {data.forecastAccuracy.pending?.length
+                      ? ` (${data.forecastAccuracy.pending.map((p) => p.month).join(', ')})`
+                      : ''}
+                    .
+                  </p>
+                )}
+              </Card>
+            )}
+
           <div className="grid grid-cols-1 xs:grid-cols-2 gap-3 min-w-0">
             <Card variant="bordered" className="!py-3 !px-3 sm:!px-4 min-w-0">
               <div className="flex items-center gap-2 mb-1.5 min-w-0">
                 <Activity className="h-4 w-4 text-primary shrink-0" />
                 <span className="text-xs text-text-muted dark:text-text-dark-muted truncate">
-                  {data.demand?.googleTrendsLabel || 'Index momentum'}
+                  {data.demand?.googleTrendsLabel || 'UK search interest'}
                 </span>
               </div>
               <p className="font-medium text-sm text-text-primary dark:text-text-dark-primary truncate">
                 {data.demand?.googleTrends ?? '—'}
               </p>
               {data.demand?.googleTrendsDetail && (
-                <p className="text-[11px] text-text-muted mt-1 leading-snug">
+                <p className="text-[11px] text-text-muted mt-1 leading-snug" data-detail>
                   {data.demand.googleTrendsDetail}
                 </p>
               )}
@@ -230,15 +403,16 @@ export default function Market() {
               <div className="flex items-center gap-2 mb-1.5 min-w-0">
                 <Users className="h-4 w-4 text-primary shrink-0" />
                 <span className="text-xs text-text-muted dark:text-text-dark-muted truncate">
-                  {data.demand?.redditLabel || 'Farmer planting'}
+                  {data.demand?.districtShareLabel || 'District planting share'}
                 </span>
+                {(data.demand?.plantingDemo || data.demand?.demo) && <DemoTag />}
               </div>
               <p className="font-medium text-sm text-text-primary dark:text-text-dark-primary truncate">
-                {data.demand?.reddit ?? '—'}
+                {data.demand?.districtShare ?? '—'}
               </p>
-              {data.demand?.redditDetail && (
-                <p className="text-[11px] text-text-muted mt-1 leading-snug">
-                  {data.demand.redditDetail}
+              {data.demand?.districtShareDetail && (
+                <p className="text-[11px] text-text-muted mt-1 leading-snug" data-detail>
+                  {data.demand.districtShareDetail}
                 </p>
               )}
             </Card>
@@ -246,13 +420,13 @@ export default function Market() {
 
           <Card variant="bordered" className="min-w-0 !p-3 sm:!p-4">
             <h2 className="text-xs sm:text-sm font-medium text-text-secondary dark:text-text-dark-secondary mb-1 px-0.5">
-              Month by month
+              {monthListTitle}
             </h2>
             <WeeklyPriceList rows={weeklyRows} unit={priceUnit} />
           </Card>
 
           {data.source && (
-            <p className="text-[11px] text-text-muted dark:text-text-dark-muted px-0.5">
+            <p className="text-[11px] text-text-muted dark:text-text-dark-muted px-0.5" data-detail>
               Source · {data.source}
               {data.category ? ` · series: ${String(data.category).replace(/_/g, ' ')}` : ''}
             </p>

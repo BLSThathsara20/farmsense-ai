@@ -23,7 +23,11 @@ export const authService = {
       return { user: { ...farmer, role: 'farmer' }, token: 'mock-token' }
     }
 
-    return backendClient.post(backendEndpoints.auth.login, { email, password })
+    return backendClient.post(
+      backendEndpoints.auth.login,
+      { email, password },
+      { timeout: 10000 }
+    )
   },
 
   async register(payload) {
@@ -44,18 +48,32 @@ export const authService = {
       }
     }
 
-    return backendClient.post(backendEndpoints.auth.register, payload)
+    return backendClient.post(backendEndpoints.auth.register, payload, { timeout: 12000 })
   },
 
   async getProfile() {
     if (apiConfig.useMock) {
       return withMockDelay({
-        user: { ...farmers[0], role: 'farmer' },
+        user: { ...farmers[0], role: 'farmer', simpleMode: false, demoDataMode: false },
         account: { email: farmers[0].email, createdAt: new Date().toISOString() },
         savedData: { soilReadingsCount: 0, recommendationRunsCount: 0, hasSoilData: false },
       })
     }
-    return backendClient.get(backendEndpoints.auth.me)
+    return backendClient.get(backendEndpoints.auth.me, undefined, { timeout: 10000 })
+  },
+
+  async updatePreferences(prefs) {
+    if (apiConfig.useMock) {
+      return withMockDelay({
+        user: {
+          ...farmers[0],
+          role: 'farmer',
+          simpleMode: prefs.simpleMode ?? false,
+          demoDataMode: prefs.demoDataMode ?? false,
+        },
+      })
+    }
+    return backendClient.patch(backendEndpoints.auth.preferences, prefs, { timeout: 10000 })
   },
 
   async forgotPassword(email) {

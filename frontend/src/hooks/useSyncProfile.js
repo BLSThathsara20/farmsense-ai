@@ -1,18 +1,19 @@
 import { useEffect } from 'react'
 import { useAuthStore } from '../store/authStore'
 import { useFarmStore } from '../store/farmStore'
-import { authService, apiConfig } from '../api'
+import { authService, apiConfig, ApiError } from '../api'
 import { isAdminUser } from '../lib/roles'
 
 /** Keep local farm UI in sync with PostgreSQL for the signed-in user. */
 export function useSyncProfile() {
-  const isAuthenticated = useAuthStore((s) => s.isAuthenticated)
+  const sessionStatus = useAuthStore((s) => s.sessionStatus)
   const userId = useAuthStore((s) => s.user?.id)
   const user = useAuthStore((s) => s.user)
   const updateProfile = useAuthStore((s) => s.updateProfile)
+  const logout = useAuthStore((s) => s.logout)
 
   useEffect(() => {
-    if (!isAuthenticated || apiConfig.useMock) return
+    if (sessionStatus !== 'authenticated' || apiConfig.useMock) return
     if (isAdminUser(user)) return
 
     let cancelled = false
@@ -46,14 +47,23 @@ export function useSyncProfile() {
 
         const hasSoil = Boolean(profile?.savedData?.hasSoilData)
         const lastRec = profile?.savedData?.lastRecommendation
-        if (hasSoil) {
-          const patch = { hasSoilData: true }
+        const overview = profile?.savedData?.plansOverview
+        const patch = {}
+        if (overview) {
+          patch.plansOverview = overview
+          patch.plans = overview.plans || []
+          if (overview.latestPlanId) patch.activePlanId = overview.latestPlanId
+        }
+        if (hasSoil || (overview?.totalPlans || 0) > 0) {
+          patch.hasSoilData = true
           if (lastRec?.finalized && lastRec.selectedCrops?.length) {
             patch.selectedCrops = lastRec.selectedCrops
             patch.cropPlanConfirmedAt = lastRec.finalizedAt || new Date().toISOString()
             patch.lastRecommendation = lastRec.selectedCrops[0]
+            if (lastRec.planId) patch.activePlanId = lastRec.planId
           } else if (lastRec && !lastRec.finalized) {
             patch.cropPlanConfirmedAt = null
+            if (lastRec.planId) patch.activePlanId = lastRec.planId
           }
           useFarmStore.setState(patch)
         } else {
@@ -63,15 +73,23 @@ export function useSyncProfile() {
             lastSoilReading: null,
             selectedCrops: [],
             cropPlanConfirmedAt: null,
+            plans: [],
+            activePlanId: null,
+            plansOverview: overview || null,
           })
         }
-      } catch {
-        /* offline or token expired — pages handle errors */
+      } catch (err) {
+        if (cancelled) return
+        const status = err instanceof ApiError ? err.status : err?.status
+        if (status === 401 || status === 403) {
+          useFarmStore.getState().resetFarmData()
+          logout()
+        }
       }
     })()
 
     return () => {
       cancelled = true
     }
-  }, [isAuthenticated, userId, user, updateProfile])
+  }, [sessionStatus, userId, user, updateProfile, logout])
 }

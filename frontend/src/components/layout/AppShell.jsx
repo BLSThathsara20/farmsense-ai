@@ -3,11 +3,19 @@ import { Navbar } from './Navbar'
 import { BottomNav } from './BottomNav'
 import { Sidebar } from './BottomNav'
 import { AdminBottomNav, AdminSidebar } from './AdminNav'
+import { useAuthSession } from '../../hooks/useAuthSession'
+import { useSimpleMode } from '../../hooks/useSimpleMode'
+import { SimpleModePrompt } from '../shared/SimpleModePrompt'
 import { cn } from '../../lib/utils'
 
 const publicRoutes = ['/', '/login', '/register', '/forgot-password', '/reset-password']
 
 export function AppShell() {
+  // Always validate persisted sessions (even on public routes) so /login
+  // does not bounce to dashboard with a stale localStorage token.
+  useAuthSession()
+  useSimpleMode()
+
   const location = useLocation()
   const isPublic = publicRoutes.includes(location.pathname)
   const isAdmin = location.pathname.startsWith('/admin')
@@ -33,6 +41,7 @@ export function AppShell() {
 
   return (
     <div className="min-h-dvh bg-bg dark:bg-bg-dark flex ek-page-grain">
+      <SimpleModePrompt />
       <Sidebar />
       <div className="flex-1 flex flex-col min-h-dvh min-w-0 overflow-x-hidden">
         <Navbar showLogo={false} className="md:hidden" />

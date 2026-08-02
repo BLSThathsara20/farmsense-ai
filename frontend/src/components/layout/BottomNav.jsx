@@ -6,7 +6,7 @@ import { spring } from '../../lib/motion'
 
 const navItems = [
   { to: '/dashboard', icon: Home, label: 'Home' },
-  { to: '/plan', icon: Sprout, label: 'Plan' },
+  { to: '/plans', icon: Sprout, label: 'Plan' },
   { to: '/market', icon: TrendingUp, label: 'Market' },
   { to: '/community', icon: Users, label: 'Community' },
   { to: '/settings', icon: Settings, label: 'Settings' },

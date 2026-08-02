@@ -15,6 +15,8 @@ CREATE TABLE user_account (
     full_name       VARCHAR(120),
     role            user_role NOT NULL DEFAULT 'farmer',
     is_active       BOOLEAN NOT NULL DEFAULT TRUE,
+    simple_mode     BOOLEAN NOT NULL DEFAULT FALSE,
+    demo_data_mode  BOOLEAN NOT NULL DEFAULT FALSE,
     created_at      TIMESTAMPTZ NOT NULL DEFAULT NOW(),
     updated_at      TIMESTAMPTZ NOT NULL DEFAULT NOW(),
     last_login_at   TIMESTAMPTZ
@@ -65,6 +67,7 @@ CREATE TABLE recommendation_run (
     id                  UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     farm_profile_id     UUID NOT NULL REFERENCES farm_profile(id) ON DELETE CASCADE,
     soil_reading_id     UUID REFERENCES soil_reading(id) ON DELETE SET NULL,
+    title               VARCHAR(160),
     model_bundle_version VARCHAR(40) NOT NULL DEFAULT 'v1',
     status              recommendation_status NOT NULL DEFAULT 'completed',
     ranked_output       JSONB NOT NULL,

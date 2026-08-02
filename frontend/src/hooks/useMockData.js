@@ -6,6 +6,9 @@ import {
   farmService,
 } from '../api'
 import { useAsyncData } from './useAsyncData'
+import { useEffect } from 'react'
+import { useFarmStore } from '../store/farmStore'
+import { useAuthStore } from '../store/authStore'
 
 /** Dashboard + farmer profile from GET /dashboard (live backend when mock is off). */
 export function useMockData() {
@@ -13,6 +16,14 @@ export function useMockData() {
     () => dashboardService.getDashboard(),
     []
   )
+
+  useEffect(() => {
+    if (!data?.plansOverview) return
+    useFarmStore.getState().setPlansOverview(data.plansOverview)
+    if (data.plansOverview.plans) {
+      useFarmStore.getState().setPlans(data.plansOverview.plans)
+    }
+  }, [data])
 
   return {
     loading,
@@ -27,6 +38,8 @@ export function useMockData() {
     soilReadings: data?.soilReadings,
     dashboardStats: data?.stats,
     hasSoilData: data?.hasSoilData ?? false,
+    plansOverview: data?.plansOverview ?? null,
+    allSelectedCrops: data?.allSelectedCrops ?? data?.plansOverview?.allSelectedCrops ?? [],
     crops: farmService.getCropPreferences().filter((c) => c !== 'No preference'),
     regions: farmService.getRegions(),
     textureOptions: farmService.getTextureOptions(),
@@ -35,9 +48,10 @@ export function useMockData() {
 }
 
 export function useMarketData(crop = 'Tomato') {
+  const demoDataMode = useAuthStore((s) => Boolean(s.user?.demoDataMode))
   const { data, loading, error, retry } = useAsyncData(
     () => marketService.getMarketData(crop),
-    [crop]
+    [crop, demoDataMode]
   )
 
   return {
@@ -49,10 +63,13 @@ export function useMarketData(crop = 'Tomato') {
   }
 }
 
-export function useRecommendations() {
+export function useRecommendations(planId) {
   const { data, loading, error, retry } = useAsyncData(
-    () => recommendationsService.getRecommendations(),
-    []
+    () =>
+      planId
+        ? recommendationsService.getPlan(planId)
+        : recommendationsService.getRecommendations(),
+    [planId || 'latest']
   )
 
   return {
@@ -66,13 +83,42 @@ export function useRecommendations() {
     finalized: Boolean(data?.finalized),
     selectedCropsFromServer: data?.selectedCrops ?? [],
     finalizedAt: data?.finalizedAt ?? null,
+    planId: data?.planId || data?.runId || planId || null,
+    title: data?.title || null,
+  }
+}
+
+export function usePlansList() {
+  const { data, loading, error, retry } = useAsyncData(
+    () => recommendationsService.listPlans(),
+    []
+  )
+  return {
+    loading,
+    error,
+    retry,
+    plans: data?.plans ?? [],
+  }
+}
+
+export function usePlansOverview() {
+  const { data, loading, error, retry } = useAsyncData(
+    () => recommendationsService.getPlansOverview(),
+    []
+  )
+  return {
+    loading,
+    error,
+    retry,
+    overview: data,
   }
 }
 
 export function useCommunityData() {
+  const demoDataMode = useAuthStore((s) => Boolean(s.user?.demoDataMode))
   const { data, loading, error, retry } = useAsyncData(
     () => communityService.getDistrictData(),
-    []
+    [demoDataMode]
   )
 
   return {

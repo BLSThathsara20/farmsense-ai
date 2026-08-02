@@ -2,7 +2,7 @@ import { cn } from '../../lib/utils'
 
 /**
  * Live = PostgreSQL farmers (excludes test accounts).
- * Dummy = sample data for demos / screenshots only.
+ * Demo = sample data for screenshots only — always labelled as Demo in the UI.
  */
 export function AdminDataModeSwitch({ mode, onChange, className }) {
   return (
@@ -33,11 +33,11 @@ export function AdminDataModeSwitch({ mode, onChange, className }) {
         className={cn(
           'px-3 py-1.5 rounded-md text-xs font-medium min-h-[36px] transition-colors',
           mode === 'dummy'
-            ? 'bg-surface dark:bg-surface-dark text-text-primary dark:text-text-dark-primary shadow-sm'
+            ? 'bg-warning/15 text-warning shadow-sm ring-1 ring-inset ring-warning/30'
             : 'text-text-muted dark:text-text-dark-muted hover:text-text-primary'
         )}
       >
-        Dummy data
+        Demo data
       </button>
     </div>
   )

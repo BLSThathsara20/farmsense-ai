@@ -1,18 +1,20 @@
 from datetime import UTC, datetime
 
-from sqlalchemy import desc, select
+from sqlalchemy import desc, func, select
 from sqlalchemy.orm import Session
 
 from app.core.config import get_settings
 from sqlalchemy.orm.attributes import flag_modified
 
 from app.db.models import (
+    ConfirmedCropPlan,
     CropReference,
     DistrictCropAggregate,
     FarmProfile,
     OversupplyAlert,
     RecommendationRun,
     RecommendationStatus,
+    SoilReading,
 )
 from app.ml.loader import district_oversupply_warning, predict_suitability, rank_by_profit
 from app.services.soil_service import soil_to_ml_vector
@@ -72,6 +74,56 @@ def _is_uk_focus(label: str) -> bool:
     return k in UK_FOCUS_CROPS or k.rstrip("s") in UK_FOCUS_CROPS
 
 
+def _district_crop_share(
+    db: Session | None,
+    farm: FarmProfile | None,
+    crop_name: str,
+) -> tuple[float | None, float | None, str | None]:
+    """Return district share/risk for a crop from finalized community plans when available."""
+    if not db or not farm:
+        return None, None, None
+
+    now = datetime.now(UTC)
+    crop = db.scalar(
+        select(CropReference).where(CropReference.display_name.ilike(crop_name.strip())).limit(1)
+    )
+    if not crop:
+        return None, None, None
+
+    crop_count = (
+        db.scalar(
+            select(func.coalesce(func.sum(DistrictCropAggregate.plan_count), 0)).where(
+                DistrictCropAggregate.district_code == farm.district_code,
+                DistrictCropAggregate.crop_id == crop.id,
+                DistrictCropAggregate.season_year == now.year,
+                DistrictCropAggregate.week_number == now.isocalendar().week,
+            )
+        )
+        or 0
+    )
+    district_total = (
+        db.scalar(
+            select(func.coalesce(func.sum(DistrictCropAggregate.plan_count), 0)).where(
+                DistrictCropAggregate.district_code == farm.district_code,
+                DistrictCropAggregate.season_year == now.year,
+                DistrictCropAggregate.week_number == now.isocalendar().week,
+            )
+        )
+        or 0
+    )
+    if district_total <= 0:
+        return None, None, None
+
+    settings = get_settings()
+    share_pct = round((float(crop_count) / float(district_total)) * 100, 1)
+    oversupply_risk = min(0.95, float(crop_count) / float(settings.oversupply_threshold))
+    return (
+        share_pct,
+        oversupply_risk,
+        f"{crop_count} of {district_total} finalized local plans chose {crop.display_name}.",
+    )
+
+
 def _select_ranked_probs(
     probabilities: dict[str, float],
     *,
@@ -121,6 +173,8 @@ def build_recommendations_from_rf(
     preferences: list[str],
     ml_input: dict | None = None,
     *,
+    db: Session | None = None,
+    farm: FarmProfile | None = None,
     country_code: str = "GB",
     district: str | None = None,
     price_outlook: dict | None = None,
@@ -165,7 +219,8 @@ def build_recommendations_from_rf(
             district=district,
         )
         crop_price = forecast_crop_price_outlook(display)
-        oversupply = max(0.1, 0.7 - prob)
+        share_pct, district_risk, share_detail = _district_crop_share(db, farm, display)
+        oversupply = district_risk if district_risk is not None else max(0.1, 0.7 - prob)
 
         search_change = None
         try:
@@ -176,8 +231,11 @@ def build_recommendations_from_rf(
 
         demand = score_demand_outlook(
             oversupply_risk=oversupply,
+            district_plan_share=share_pct,
             search_change_pct=search_change,
         )
+        if share_detail:
+            demand["detail"] = f"{share_detail} {demand['detail']}"
 
         weather_fit = weather["score"]
         # Extra temperate filter — cool GB weeks should not promote rice/banana
@@ -204,13 +262,13 @@ def build_recommendations_from_rf(
         profit = int(1800 + prob * 2600 + pref_boost * 20 + uk_boost * 15 + float(forecast_mean) * 8)
 
         soil_detail = (
-            f"Random Forest soil match for {display} "
-            f"(model probability {prob:.0%}, relative {soil_match}%)."
+            f"Your soil looks a {soil_match}% match for {display} "
+            f"(N, P, K, pH and texture checked against what this crop needs)."
         )
         if (country_code or "GB").upper() == "GB" and uk_boost:
-            soil_detail += " Boosted as a UK-focus crop for this market."
+            soil_detail += " Good fit for UK growing conditions."
         if tropical_cut:
-            soil_detail += " Down-weighted for temperate UK field conditions."
+            soil_detail += " Less suited to cool UK field conditions."
 
         factors = [
             {
@@ -231,7 +289,7 @@ def build_recommendations_from_rf(
             },
             {
                 "key": "price",
-                "title": "Future price",
+                "title": "Future price (£)",
                 "score": price_trend,
                 "detail": crop_price["detail"],
                 "source": crop_price["source"],
@@ -239,7 +297,7 @@ def build_recommendations_from_rf(
             },
             {
                 "key": "demand",
-                "title": "Market demand",
+                "title": "Demand and community pressure",
                 "score": demand_signal,
                 "detail": demand["detail"],
                 "source": demand["source"],
@@ -267,7 +325,7 @@ def build_recommendations_from_rf(
                 "reasoning": (
                     f"{display} scored {confidence}% overall from UK-biased soil (L1), "
                     f"hybrid weather ({weather['method']}), dampened GOV.UK price, "
-                    f"and demand + public search signals."
+                    f"and public demand plus district planting signals."
                 ),
                 "rank": idx,
             }
@@ -285,12 +343,17 @@ def generate_recommendation_run(db: Session, farm: FarmProfile, reading) -> dict
         rf["probabilities"],
         reading.crop_preferences or [],
         ml_input,
+        db=db,
+        farm=farm,
         country_code=farm.country_code or "GB",
         district=farm.district_name or farm.region_label,
         price_outlook=price_outlook,
     )
     for i, rec in enumerate(recommendations, start=1):
         rec["rank"] = i
+
+    top_name = recommendations[0]["crop"] if recommendations else "Crop"
+    title = f"Plan · {top_name} · {datetime.now(UTC).strftime('%d %b %Y')}"
 
     payload = {
         "recommendations": recommendations,
@@ -302,6 +365,8 @@ def generate_recommendation_run(db: Session, farm: FarmProfile, reading) -> dict
         "finalizedAt": None,
         "selectedCrops": [],
         "runId": None,
+        "planId": None,
+        "title": title,
         "modelLayers": {
             "l1": "rf_suitability.pkl",
             "l2_weather": "lstm_weather.h5 + Open-Meteo agri (ET₀, soil moisture)",
@@ -326,6 +391,7 @@ def generate_recommendation_run(db: Session, farm: FarmProfile, reading) -> dict
     run = RecommendationRun(
         farm_profile_id=farm.id,
         soil_reading_id=reading.id,
+        title=title,
         model_bundle_version="v2-layers",
         status=RecommendationStatus.partial,  # draft — not finalized yet
         ranked_output=payload,
@@ -337,20 +403,31 @@ def generate_recommendation_run(db: Session, farm: FarmProfile, reading) -> dict
     db.commit()
     db.refresh(run)
     payload["runId"] = str(run.id)
+    payload["planId"] = str(run.id)
     run.ranked_output = payload
     flag_modified(run, "ranked_output")
     db.commit()
     return payload
 
 
-def _bump_district_plans(db: Session, farm: FarmProfile, crop_names: list[str]) -> None:
-    """Count finalized crop choices toward district planting pressure."""
+def _resolve_crop(db: Session, name: str) -> CropReference | None:
+    return db.scalar(
+        select(CropReference).where(CropReference.display_name.ilike(name)).limit(1)
+    )
+
+
+def _bump_district_plans(
+    db: Session,
+    farm: FarmProfile,
+    crop_names: list[str],
+    *,
+    run: RecommendationRun | None = None,
+) -> None:
+    """Count finalized crop choices toward district planting pressure + confirmed_crop_plan rows."""
     year = datetime.now(UTC).year
     week = datetime.now(UTC).isocalendar().week
     for name in crop_names:
-        crop = db.scalar(
-            select(CropReference).where(CropReference.display_name.ilike(name)).limit(1)
-        )
+        crop = _resolve_crop(db, name)
         if not crop:
             continue
         agg = db.scalar(
@@ -373,24 +450,195 @@ def _bump_district_plans(db: Session, farm: FarmProfile, crop_names: list[str]) 
                     plan_count=1,
                 )
             )
+        if run is not None:
+            db.add(
+                ConfirmedCropPlan(
+                    farm_profile_id=farm.id,
+                    recommendation_run_id=run.id,
+                    crop_id=crop.id,
+                    season_year=year,
+                    week_number=week,
+                    contributes_to_district=True,
+                )
+            )
+
+
+def _decrement_district_for_run(db: Session, farm: FarmProfile, run: RecommendationRun) -> None:
+    """Remove confirmed_crop_plan rows and decrement district aggregates for a finalized plan."""
+    rows = db.scalars(
+        select(ConfirmedCropPlan).where(
+            ConfirmedCropPlan.recommendation_run_id == run.id,
+            ConfirmedCropPlan.contributes_to_district.is_(True),
+        )
+    ).all()
+    for row in rows:
+        agg = db.scalar(
+            select(DistrictCropAggregate).where(
+                DistrictCropAggregate.district_code == farm.district_code,
+                DistrictCropAggregate.crop_id == row.crop_id,
+                DistrictCropAggregate.season_year == row.season_year,
+                DistrictCropAggregate.week_number == row.week_number,
+            )
+        )
+        if agg and int(agg.plan_count or 0) > 0:
+            agg.plan_count = int(agg.plan_count) - 1
+        db.delete(row)
+
+
+def _plan_payload_from_run(run: RecommendationRun) -> dict:
+    payload = dict(run.ranked_output or {})
+    payload["runId"] = str(run.id)
+    payload["planId"] = str(run.id)
+    payload["title"] = run.title or payload.get("title") or f"Plan · {run.top_crop or 'Crop'}"
+    if run.created_at:
+        payload["createdAt"] = run.created_at.isoformat()
+    if run.status == RecommendationStatus.completed:
+        payload.setdefault("planStatus", "finalized")
+        payload.setdefault("finalized", True)
+    else:
+        payload.setdefault("planStatus", "draft")
+        payload.setdefault("finalized", False)
+    return payload
+
+
+def _get_farm_run(db: Session, farm: FarmProfile, run_id) -> RecommendationRun | None:
+    import uuid as uuid_mod
+
+    try:
+        rid = run_id if isinstance(run_id, uuid_mod.UUID) else uuid_mod.UUID(str(run_id))
+    except (ValueError, TypeError):
+        return None
+    return db.scalar(
+        select(RecommendationRun).where(
+            RecommendationRun.id == rid,
+            RecommendationRun.farm_profile_id == farm.id,
+        )
+    )
+
+
+def list_plans(db: Session, farm: FarmProfile) -> list[dict]:
+    runs = db.scalars(
+        select(RecommendationRun)
+        .where(RecommendationRun.farm_profile_id == farm.id)
+        .order_by(desc(RecommendationRun.created_at))
+    ).all()
+    items = []
+    for run in runs:
+        payload = _plan_payload_from_run(run)
+        selected = payload.get("selectedCrops") or []
+        items.append(
+            {
+                "planId": str(run.id),
+                "runId": str(run.id),
+                "title": payload.get("title"),
+                "planStatus": payload.get("planStatus"),
+                "finalized": bool(payload.get("finalized")),
+                "finalizedAt": payload.get("finalizedAt"),
+                "topCrop": run.top_crop or (selected[0].get("crop") if selected else None),
+                "topProfitEstimate": float(run.top_profit_estimate)
+                if run.top_profit_estimate is not None
+                else None,
+                "selectedCrops": [
+                    {"id": c.get("id"), "crop": c.get("crop"), "confidence": c.get("confidence")}
+                    for c in selected
+                ],
+                "createdAt": run.created_at.isoformat() if run.created_at else None,
+                "runDate": payload.get("runDate"),
+            }
+        )
+    return items
+
+
+def get_plan(db: Session, farm: FarmProfile, run_id) -> dict | None:
+    run = _get_farm_run(db, farm, run_id)
+    if not run:
+        return None
+    payload = _plan_payload_from_run(run)
+    if run.soil_reading_id:
+        reading = db.get(SoilReading, run.soil_reading_id)
+        if reading:
+            from app.services.soil_service import soil_reading_to_json
+
+            payload["soilReading"] = soil_reading_to_json(reading, farm.region_label)
+    return payload
+
+
+def plans_overview(db: Session, farm: FarmProfile) -> dict:
+    plans = list_plans(db, farm)
+    drafts = [p for p in plans if p.get("planStatus") == "draft" and not p.get("finalized")]
+    finalized = [p for p in plans if p.get("finalized") or p.get("planStatus") == "finalized"]
+    crop_map: dict[str, dict] = {}
+    for p in finalized:
+        for c in p.get("selectedCrops") or []:
+            name = c.get("crop")
+            if not name:
+                continue
+            if name not in crop_map:
+                crop_map[name] = {
+                    "crop": name,
+                    "planId": p["planId"],
+                    "planTitle": p.get("title"),
+                    "confidence": c.get("confidence"),
+                }
+    return {
+        "totalPlans": len(plans),
+        "draftCount": len(drafts),
+        "finalizedCount": len(finalized),
+        "allSelectedCrops": list(crop_map.values()),
+        "plans": plans,
+        "latestPlanId": plans[0]["planId"] if plans else None,
+        "latestActivity": [
+            {
+                "planId": p["planId"],
+                "title": p.get("title"),
+                "status": p.get("planStatus"),
+                "date": (p.get("finalizedAt") or p.get("createdAt") or "")[:10],
+            }
+            for p in plans[:5]
+        ],
+    }
+
+
+def rename_plan(db: Session, farm: FarmProfile, run_id, title: str) -> dict:
+    run = _get_farm_run(db, farm, run_id)
+    if not run:
+        raise ValueError("Plan not found.")
+    clean = (title or "").strip()[:160]
+    if not clean:
+        raise ValueError("Title cannot be empty.")
+    run.title = clean
+    payload = dict(run.ranked_output or {})
+    payload["title"] = clean
+    run.ranked_output = payload
+    flag_modified(run, "ranked_output")
+    db.commit()
+    db.refresh(run)
+    return _plan_payload_from_run(run)
 
 
 def finalize_recommendation_run(
     db: Session,
     farm: FarmProfile,
     selected_crop_ids: list[int],
+    run_id=None,
 ) -> dict:
-    """Lock in the farmer's crop choices. Plan steps stay draft until this runs."""
-    run = db.scalar(
-        select(RecommendationRun)
-        .where(RecommendationRun.farm_profile_id == farm.id)
-        .order_by(desc(RecommendationRun.created_at))
-        .limit(1)
-    )
+    """Lock in the farmer's crop choices for a specific plan (or latest if run_id omitted)."""
+    if run_id is not None:
+        run = _get_farm_run(db, farm, run_id)
+        if not run:
+            raise ValueError("Plan not found.")
+    else:
+        run = db.scalar(
+            select(RecommendationRun)
+            .where(RecommendationRun.farm_profile_id == farm.id)
+            .order_by(desc(RecommendationRun.created_at))
+            .limit(1)
+        )
     if not run:
         raise ValueError("No recommendation run to finalize — submit soil plan first.")
 
     payload = dict(run.ranked_output or {})
+    already_final = bool(payload.get("finalized")) or run.status == RecommendationStatus.completed
     all_recs = payload.get("recommendations") or []
     if not all_recs:
         raise ValueError("Recommendation run has no crops.")
@@ -398,7 +646,6 @@ def finalize_recommendation_run(
     id_set = set(selected_crop_ids)
     selected = [r for r in all_recs if r.get("id") in id_set]
     if not selected:
-        # Allow matching by crop name if ids drifted
         raise ValueError("Pick at least one recommended crop to confirm.")
 
     # Prefer highest-confidence selected as the "top" displayed plan
@@ -412,19 +659,44 @@ def finalize_recommendation_run(
             "selectedCrops": selected_sorted,
             "topRecommendation": selected_sorted[0],
             "runId": str(run.id),
+            "planId": str(run.id),
+            "title": run.title or payload.get("title"),
         }
     )
+
+    # Re-finalize: remove previous district contributions first
+    if already_final:
+        _decrement_district_for_run(db, farm, run)
 
     run.ranked_output = payload
     flag_modified(run, "ranked_output")
     run.status = RecommendationStatus.completed
     run.top_crop = selected_sorted[0].get("crop")
     run.top_profit_estimate = selected_sorted[0].get("profitEstimate")
+    if run.top_crop and not run.title:
+        run.title = f"Plan · {run.top_crop} · {datetime.now(UTC).strftime('%d %b %Y')}"
+        payload["title"] = run.title
 
-    _bump_district_plans(db, farm, [c.get("crop") for c in selected_sorted if c.get("crop")])
+    _bump_district_plans(
+        db,
+        farm,
+        [c.get("crop") for c in selected_sorted if c.get("crop")],
+        run=run,
+    )
     db.commit()
     db.refresh(run)
-    return payload
+    return _plan_payload_from_run(run)
+
+
+def delete_plan(db: Session, farm: FarmProfile, run_id) -> dict:
+    """Delete one plan and adjust district aggregates if it was finalized."""
+    run = _get_farm_run(db, farm, run_id)
+    if not run:
+        raise ValueError("Plan not found.")
+    _decrement_district_for_run(db, farm, run)
+    db.delete(run)
+    db.commit()
+    return {"deleted": True, "planId": str(run_id), "runsDeleted": 1}
 
 
 def delete_recommendation_plans(db: Session, farm: FarmProfile) -> dict:
@@ -434,6 +706,7 @@ def delete_recommendation_plans(db: Session, farm: FarmProfile) -> dict:
     ).all()
     count = len(runs)
     for run in runs:
+        _decrement_district_for_run(db, farm, run)
         db.delete(run)
     db.commit()
     return {"deleted": True, "runsDeleted": count}
@@ -448,24 +721,15 @@ def latest_recommendations(db: Session, farm: FarmProfile) -> dict | None:
     )
     if not run:
         return None
-    payload = dict(run.ranked_output or {})
-    payload.setdefault("runId", str(run.id))
-    # Keep API status aligned with DB even for older rows
-    if run.status == RecommendationStatus.completed:
-        payload.setdefault("planStatus", "finalized")
-        payload.setdefault("finalized", True)
-    else:
-        payload.setdefault("planStatus", "draft")
-        payload.setdefault("finalized", False)
-    return payload
+    return _plan_payload_from_run(run)
 
 
-def get_market_payload(db: Session, crop_name: str) -> dict:
+def get_market_payload(db: Session, crop_name: str, *, demo_data_mode: bool = False) -> dict:
     from app.ml.pipeline_layers import build_weekly_price_payload_from_series, forecast_price_outlook
     from app.services.market_data_service import build_crop_market_payload
 
     try:
-        return build_crop_market_payload(db, crop_name)
+        return build_crop_market_payload(db, crop_name, demo_data_mode=demo_data_mode)
     except Exception:
         # Fallback: general ag index from price_weekly.csv
         try:
@@ -531,7 +795,7 @@ def list_active_crops(db: Session) -> list[str]:
     return list(rows) or ["Tomato", "Maize", "Rice", "Potato", "Cabbage"]
 
 
-def community_payload(db: Session, farm: FarmProfile) -> dict:
+def community_payload(db: Session, farm: FarmProfile, *, demo_data_mode: bool = False) -> dict:
     settings = get_settings()
     year = datetime.now(UTC).year
     week = datetime.now(UTC).isocalendar().week
@@ -547,7 +811,17 @@ def community_payload(db: Session, farm: FarmProfile) -> dict:
     ).all()
 
     if not aggregates:
-        return _default_community(farm.district_name)
+        if demo_data_mode:
+            return _demo_community_payload(farm.district_name, week)
+        return {
+            "district": farm.district_name,
+            "week": f"Week {week}",
+            "cropPopularity": [],
+            "oversupplyRisk": [],
+            "empty": True,
+            "demo": False,
+            "message": "No finalized plans in this district this week yet. Counts appear after farmers finalize crop plans.",
+        }
 
     total = sum(a.plan_count for a in aggregates) or 1
     crop_popularity = []
@@ -569,27 +843,42 @@ def community_payload(db: Session, farm: FarmProfile) -> dict:
         "week": f"Week {week}",
         "cropPopularity": crop_popularity,
         "oversupplyRisk": oversupply_risk,
+        "empty": False,
+        "demo": False,
     }
 
 
-def _default_community(district_name: str) -> dict:
+def _demo_community_payload(district_name: str, week: int) -> dict:
+    """Sample district view — only used when Demo data mode is on and real counts are missing."""
     return {
         "district": district_name,
-        "week": f"Week {datetime.now(UTC).isocalendar().week}",
+        "week": f"Week {week}",
         "cropPopularity": [
-            {"crop": "Tomato", "percentage": 34, "farmers": 128},
-            {"crop": "Maize", "percentage": 22, "farmers": 83},
-            {"crop": "Rice", "percentage": 18, "farmers": 68},
+            {"crop": "Tomato", "percentage": 34, "farmers": 12},
+            {"crop": "Potato", "percentage": 28, "farmers": 10},
+            {"crop": "Cabbage", "percentage": 22, "farmers": 8},
+            {"crop": "Onion", "percentage": 16, "farmers": 6},
         ],
         "oversupplyRisk": [
-            {"crop": "Cabbage", "risk": 0.72, "level": "high"},
-            {"crop": "Tomato", "risk": 0.15, "level": "low"},
+            {"crop": "Tomato", "risk": 0.55, "level": "medium"},
+            {"crop": "Potato", "risk": 0.35, "level": "medium"},
+            {"crop": "Cabbage", "risk": 0.2, "level": "low"},
+            {"crop": "Onion", "risk": 0.15, "level": "low"},
         ],
+        "empty": False,
+        "demo": True,
+        "message": "Sample data for demos — turn off Demo data mode in Settings to see live district counts only.",
     }
 
 
 def dashboard_payload(db: Session, user, farm: FarmProfile, recs: dict | None, reading) -> dict:
+    overview = plans_overview(db, farm)
     top = recs.get("topRecommendation") if recs else None
+    # Prefer first finalized crop across plans for overall headline when available
+    overall_crops = overview.get("allSelectedCrops") or []
+    if overall_crops and not top:
+        top = {"crop": overall_crops[0]["crop"], "confidence": overall_crops[0].get("confidence") or 0}
+
     stats = {
         "topCropScore": top["confidence"] if top else 0,
         "priceTrend": top.get("priceTrend", 0) if top else 0,
@@ -597,6 +886,9 @@ def dashboard_payload(db: Session, user, farm: FarmProfile, recs: dict | None, r
         "sellWindow": {"start": 8, "end": 10},
         "oversupplyWarning": None,
         "recentActivity": [],
+        "draftCount": overview.get("draftCount", 0),
+        "finalizedCount": overview.get("finalizedCount", 0),
+        "totalPlans": overview.get("totalPlans", 0),
     }
     if top and top.get("oversupplyRisk", 0) >= 0.65:
         stats["oversupplyWarning"] = {
@@ -608,9 +900,14 @@ def dashboard_payload(db: Session, user, farm: FarmProfile, recs: dict | None, r
         stats["recentActivity"].append(
             {"type": "soil", "message": "Soil reading updated", "date": reading.recorded_at.date().isoformat()}
         )
-    if recs:
+    for act in overview.get("latestActivity") or []:
         stats["recentActivity"].append(
-            {"type": "recommendation", "message": "Crop plan generated", "date": recs["runDate"][:10]}
+            {
+                "type": "plan",
+                "message": f"{act.get('title') or 'Plan'} ({act.get('status')})",
+                "date": act.get("date"),
+                "planId": act.get("planId"),
+            }
         )
 
     from app.services.auth_service import user_to_json
@@ -622,9 +919,12 @@ def dashboard_payload(db: Session, user, farm: FarmProfile, recs: dict | None, r
         "recommendations": recs.get("recommendations", []) if recs else [],
         "soilReadings": soil_reading_to_json(reading, farm.region_label) if reading else {},
         "currentFarmer": user_to_json(user, farm),
-        "hasSoilData": reading is not None,
+        "hasSoilData": reading is not None or overview.get("totalPlans", 0) > 0,
         "planStatus": recs.get("planStatus") if recs else None,
         "finalized": bool(recs.get("finalized")) if recs else False,
         "selectedCrops": recs.get("selectedCrops") or [] if recs else [],
         "finalizedAt": recs.get("finalizedAt") if recs else None,
+        "plansOverview": overview,
+        "allSelectedCrops": overall_crops,
+        "latestPlanId": overview.get("latestPlanId"),
     }

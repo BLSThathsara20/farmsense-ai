@@ -48,6 +48,26 @@ html {
   scroll-behavior: smooth;
 }
 
+/* Simple Mode: larger type + hide secondary explanations */
+html[data-simple-mode='true'] {
+  font-size: 112%;
+}
+
+html[data-simple-mode='true'] body {
+  line-height: 1.55;
+  letter-spacing: 0;
+}
+
+html[data-simple-mode='true'] [data-detail] {
+  display: none !important;
+}
+
+html[data-simple-mode='true'] button,
+html[data-simple-mode='true'] a,
+html[data-simple-mode='true'] [role='button'] {
+  min-height: 48px;
+}
+
 body {
   margin: 0;
   font-family: 'Inter', system-ui, sans-serif;

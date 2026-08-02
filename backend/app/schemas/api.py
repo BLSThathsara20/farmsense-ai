@@ -66,9 +66,21 @@ class ResetPasswordRequest(BaseModel):
 
 
 class ConfirmPlanRequest(BaseModel):
-    """Finalize selected crops from the latest draft recommendation run."""
+    """Finalize selected crops from a recommendation run (latest if planId omitted)."""
 
     cropIds: list[int] = Field(min_length=1, max_length=10)
+    planId: str | None = None
+
+
+class RenamePlanRequest(BaseModel):
+    title: str = Field(min_length=1, max_length=160)
+
+
+class PreferencesRequest(BaseModel):
+    """Partial preference update — omit fields you do not want to change."""
+
+    simpleMode: bool | None = None
+    demoDataMode: bool | None = None
 
 
 class AdminModelTestRequest(BaseModel):

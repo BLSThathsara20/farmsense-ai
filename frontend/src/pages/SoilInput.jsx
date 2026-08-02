@@ -18,6 +18,7 @@ import { LocationPicker } from '../components/shared/LocationPicker'
 import { PlanVisualPanel } from '../components/shared/PlanVisualPanel'
 import { useFarmStore } from '../store/farmStore'
 import { useAuthStore } from '../store/authStore'
+import { useSimpleMode } from '../hooks/useSimpleMode'
 import { useToast } from '../hooks/useToast'
 import { farmService, getErrorMessage, soilService } from '../api'
 import { cn } from '../lib/utils'
@@ -112,6 +113,7 @@ function phPlainLabel(ph) {
 export default function SoilInput() {
   const navigate = useNavigate()
   const toast = useToast()
+  const simpleMode = useSimpleMode()
   const user = useAuthStore((s) => s.user)
   const { soilData, updateSoilData, submitSoilData } = useFarmStore()
   const [step, setStep] = useState(1)
@@ -264,15 +266,18 @@ export default function SoilInput() {
       )
       submitSoilData(soilData)
       // New soil run creates a draft — clear any previous finalized local state
+      const newPlanId =
+        result?.planId || result?.runId || result?.recommendations?.planId || result?.recommendations?.runId
       useFarmStore.setState({
         cropPlanConfirmedAt: null,
         selectedCrops: [],
+        activePlanId: newPlanId || null,
       })
       if (result?.recommendations?.topRecommendation) {
         useFarmStore.getState().setLastRecommendation(result.recommendations.topRecommendation)
       }
       toast.success('Draft crop matches ready', 'Confirm your picks on the next screen to finalize.')
-      navigate('/recommendations')
+      navigate(newPlanId ? `/plans/${newPlanId}` : '/plans')
     } catch (err) {
       toast.error('Could not build your plan', getErrorMessage(err, 'Please try again.'))
     } finally {
@@ -388,7 +393,10 @@ export default function SoilInput() {
 
                 {step === 1 && (
                   <div className="space-y-6">
-                    <p className="text-sm text-text-secondary dark:text-text-dark-secondary -mt-2">
+                    <p
+                      className="text-sm text-text-secondary dark:text-text-dark-secondary -mt-2"
+                      data-detail
+                    >
                       Your saved farm is selected by default. Tap “Use a different location” only if needed.
                     </p>
                     <LocationPicker
@@ -455,6 +463,7 @@ export default function SoilInput() {
                                 >
                                   <span className="block text-sm font-semibold">{opt.label}</span>
                                   <span
+                                    data-detail
                                     className={cn(
                                       'block text-[10px] mt-0.5',
                                       selected
@@ -678,7 +687,7 @@ export default function SoilInput() {
           </div>
         </div>
 
-        <PlanVisualPanel step={step} soilData={soilData} />
+        {!simpleMode && <PlanVisualPanel step={step} soilData={soilData} />}
       </div>
     </div>
   )

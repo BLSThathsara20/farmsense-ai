@@ -1,15 +1,27 @@
 import { Badge } from '../ui/Badge'
-import { formatCurrency, formatPriceIndex } from '../../lib/utils'
+import { formatCurrency, formatPriceIndex, formatGbpPerKg } from '../../lib/utils'
 import { cn } from '../../lib/utils'
+
+function formatRowPrice(price, unit) {
+  if (price == null) return '—'
+  if (unit === 'gbp') return `${formatGbpPerKg(price)}/kg`
+  if (unit === 'index') return `${formatPriceIndex(price)} idx`
+  return formatCurrency(price)
+}
 
 export function WeeklyPriceList({ rows, className, unit = 'currency' }) {
   if (!rows?.length) return null
-  const fmt = unit === 'index' ? formatPriceIndex : formatCurrency
 
   return (
     <ul className={cn('divide-y divide-border/60 dark:divide-border-dark/60', className)}>
       {rows.map((row) => {
         const price = row.isForecast ? row.forecast ?? row.price : row.price
+        const badgeLabel = row.isEstimated
+          ? 'Estimate'
+          : row.isForecast
+            ? 'Forecast'
+            : 'Actual'
+        const badgeVariant = row.isEstimated ? 'warning' : row.isForecast ? 'accent' : 'neutral'
         return (
           <li
             key={`${row.week}-${row.weekNum}`}
@@ -19,14 +31,19 @@ export function WeeklyPriceList({ rows, className, unit = 'currency' }) {
               {row.week}
             </span>
             <span className="font-mono text-sm font-medium text-text-primary dark:text-text-dark-primary flex-1 min-w-0 truncate">
-              {price != null ? `${fmt(price)}${unit === 'index' ? ' idx' : ''}` : '—'}
+              {formatRowPrice(price, unit)}
+              {unit === 'gbp' && row.indexPrice != null && (
+                <span className="text-text-muted font-normal ml-2">
+                  · {formatPriceIndex(row.indexPrice)} idx
+                </span>
+              )}
             </span>
             <Badge
-              variant={row.isForecast ? 'accent' : 'neutral'}
+              variant={badgeVariant}
               size="sm"
               className="shrink-0 text-[10px] sm:text-xs"
             >
-              {row.isForecast ? 'Forecast' : 'Actual'}
+              {badgeLabel}
             </Badge>
           </li>
         )

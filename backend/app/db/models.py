@@ -56,6 +56,8 @@ class UserAccount(Base):
     full_name: Mapped[str | None] = mapped_column(String(120))
     role: Mapped[UserRole] = mapped_column(Enum(UserRole, name="user_role"), default=UserRole.farmer)
     is_active: Mapped[bool] = mapped_column(Boolean, default=True)
+    simple_mode: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)
+    demo_data_mode: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
     updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now(), onupdate=func.now())
     last_login_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
@@ -124,6 +126,7 @@ class RecommendationRun(Base):
     id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
     farm_profile_id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), ForeignKey("farm_profile.id", ondelete="CASCADE"))
     soil_reading_id: Mapped[uuid.UUID | None] = mapped_column(UUID(as_uuid=True), ForeignKey("soil_reading.id", ondelete="SET NULL"))
+    title: Mapped[str | None] = mapped_column(String(160))
     model_bundle_version: Mapped[str] = mapped_column(String(40), default="v1")
     status: Mapped[RecommendationStatus] = mapped_column(
         Enum(RecommendationStatus, name="recommendation_status"), default=RecommendationStatus.completed
@@ -136,6 +139,28 @@ class RecommendationRun(Base):
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
 
     farm_profile: Mapped[FarmProfile] = relationship(back_populates="recommendation_runs")
+    confirmed_crop_plans: Mapped[list["ConfirmedCropPlan"]] = relationship(
+        back_populates="recommendation_run"
+    )
+
+
+class ConfirmedCropPlan(Base):
+    __tablename__ = "confirmed_crop_plan"
+
+    id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    farm_profile_id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True), ForeignKey("farm_profile.id", ondelete="CASCADE")
+    )
+    recommendation_run_id: Mapped[uuid.UUID | None] = mapped_column(
+        UUID(as_uuid=True), ForeignKey("recommendation_run.id", ondelete="SET NULL")
+    )
+    crop_id: Mapped[int] = mapped_column(Integer, ForeignKey("crop_reference.id"))
+    season_year: Mapped[int] = mapped_column(SmallInteger, nullable=False)
+    week_number: Mapped[int] = mapped_column(SmallInteger, nullable=False)
+    confirmed_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
+    contributes_to_district: Mapped[bool] = mapped_column(Boolean, default=True)
+
+    recommendation_run: Mapped[RecommendationRun | None] = relationship(back_populates="confirmed_crop_plans")
 
 
 class MarketSnapshot(Base):

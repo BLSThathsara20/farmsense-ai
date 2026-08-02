@@ -27,6 +27,10 @@ export const useFarmStore = create(
         communityUpdates: false,
       },
 
+      plans: [],
+      activePlanId: null,
+      plansOverview: null,
+
       updateSoilData: (data) =>
         set({
           soilData: { ...get().soilData, ...data },
@@ -41,6 +45,10 @@ export const useFarmStore = create(
 
       setLastRecommendation: (recommendation) =>
         set({ lastRecommendation: recommendation }),
+
+      setPlans: (plans) => set({ plans: plans || [] }),
+      setActivePlanId: (planId) => set({ activePlanId: planId || null }),
+      setPlansOverview: (overview) => set({ plansOverview: overview || null }),
 
       selectedCrops: [],
       cropPlanConfirmedAt: null,
@@ -80,6 +88,9 @@ export const useFarmStore = create(
           lastSoilReading: null,
           selectedCrops: [],
           cropPlanConfirmedAt: null,
+          plans: [],
+          activePlanId: null,
+          plansOverview: null,
         }),
     }),
     { name: 'farmsense-farm' }

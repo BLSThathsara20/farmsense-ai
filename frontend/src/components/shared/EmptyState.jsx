@@ -11,7 +11,7 @@ export function EmptyState({ icon: Icon, title, description, actionLabel, onActi
       <h3 className="font-display text-xl text-text-primary dark:text-text-dark-primary mb-2">
         {title}
       </h3>
-      <p className="text-text-secondary dark:text-text-dark-secondary max-w-sm mb-6">
+      <p className="text-text-secondary dark:text-text-dark-secondary max-w-sm mb-6" data-detail>
         {description}
       </p>
       {actionLabel && onAction && (
