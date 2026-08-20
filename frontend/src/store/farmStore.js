@@ -25,6 +25,7 @@ export const useFarmStore = create(
         sellAlerts: true,
         weatherAlerts: true,
         communityUpdates: false,
+        harvestReminders: true,
       },
 
       plans: [],

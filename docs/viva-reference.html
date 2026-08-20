@@ -1,0 +1,851 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+	<meta charset="UTF-8" />
+	<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+	<title>FarmSense AI — Viva &amp; Development Reference</title>
+	<script src="https://cdn.jsdelivr.net/npm/mermaid@11/dist/mermaid.min.js"></script>
+	<style>
+		:root {
+			--bg: #07110c;
+			--bg2: #0c1a14;
+			--paper: #ffffff;
+			--ink: #0f172a;
+			--muted: #475569;
+			--border: #e2e8f0;
+			--accent: #059669;
+			--accent-2: #0d9488;
+			--accent-soft: #ecfdf5;
+			--warn: #b45309;
+			--warn-soft: #fffbeb;
+			--info: #1d4ed8;
+			--info-soft: #eff6ff;
+			--soft: #f8fafc;
+			--sidebar: #0b1f17;
+			--mono: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+			--sans: "Segoe UI", ui-sans-serif, system-ui, -apple-system, Helvetica, Arial, sans-serif;
+		}
+		* { box-sizing: border-box; }
+		html { scroll-behavior: smooth; }
+		body {
+			margin: 0;
+			background: linear-gradient(165deg, var(--bg), var(--bg2) 45%, #020617);
+			font-family: var(--sans);
+			color: #e2e8f0;
+			line-height: 1.55;
+		}
+		.layout {
+			display: grid;
+			grid-template-columns: 260px minmax(0, 1fr);
+			min-height: 100vh;
+		}
+		.nav {
+			position: sticky; top: 0; align-self: start;
+			height: 100vh; overflow: auto;
+			background: rgba(11, 31, 23, 0.96);
+			border-right: 1px solid rgba(255,255,255,.08);
+			padding: 20px 14px 28px;
+		}
+		.nav .brand {
+			font-weight: 800; font-size: 15px; letter-spacing: -0.02em;
+			color: #ecfdf5; margin-bottom: 4px;
+		}
+		.nav .sub {
+			font-size: 11px; color: #94a3b8; margin-bottom: 16px;
+		}
+		.nav a {
+			display: block; color: #cbd5e1; text-decoration: none;
+			font-size: 12.5px; padding: 7px 10px; border-radius: 8px;
+			margin-bottom: 2px;
+		}
+		.nav a:hover, .nav a.active {
+			background: rgba(16, 185, 129, 0.15); color: #a7f3d0;
+		}
+		.nav .group {
+			font-size: 10px; text-transform: uppercase; letter-spacing: .08em;
+			color: #64748b; margin: 14px 10px 6px; font-weight: 700;
+		}
+		.main { padding: 24px 18px 60px; }
+		.paper {
+			max-width: 980px; margin: 0 auto;
+			background: var(--paper); color: var(--ink);
+			border-radius: 16px; border: 1px solid rgba(255,255,255,.08);
+			box-shadow: 0 24px 60px rgba(0,0,0,.4); overflow: hidden;
+		}
+		.paper-inner { padding: 28px 30px 48px; }
+		h1 { margin: 0 0 6px; font-size: 28px; letter-spacing: -0.03em; }
+		h2 {
+			margin: 36px 0 12px; font-size: 19px;
+			border-bottom: 2px solid var(--accent); padding-bottom: 6px;
+			scroll-margin-top: 16px;
+		}
+		h3 { margin: 22px 0 8px; font-size: 15px; color: #0f766e; }
+		h4 { margin: 16px 0 6px; font-size: 14px; }
+		p, li { font-size: 14px; }
+		.lead { color: var(--muted); font-size: 15px; max-width: 72ch; }
+		a { color: #047857; }
+		.badge-row { display: flex; flex-wrap: wrap; gap: 8px; margin: 12px 0 18px; }
+		.badge {
+			font-size: 11px; padding: 5px 10px; border-radius: 999px;
+			background: var(--accent-soft); color: #065f46; font-weight: 600;
+			border: 1px solid #a7f3d0;
+		}
+		.callout {
+			background: var(--accent-soft); border-left: 4px solid var(--accent);
+			padding: 12px 14px; border-radius: 0 10px 10px 0; margin: 14px 0; font-size: 14px;
+		}
+		.callout.warn { background: var(--warn-soft); border-left-color: var(--warn); }
+		.callout.info { background: var(--info-soft); border-left-color: var(--info); }
+		table.data {
+			width: 100%; border-collapse: collapse; font-size: 13px; margin: 12px 0;
+		}
+		table.data th, table.data td {
+			border: 1px solid var(--border); padding: 9px 10px;
+			text-align: left; vertical-align: top;
+		}
+		table.data th { background: var(--soft); font-weight: 600; }
+		table.data tr:nth-child(even) td { background: #fafafa; }
+		code, .path {
+			font-family: var(--mono); font-size: 12px;
+			background: var(--soft); padding: 2px 6px; border-radius: 4px;
+		}
+		.path-block {
+			background: #0f172a; color: #e2e8f0; padding: 14px 16px;
+			border-radius: 10px; font-family: var(--mono); font-size: 11.5px;
+			line-height: 1.65; white-space: pre; overflow-x: auto; margin: 10px 0;
+		}
+		.grid-2 { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; }
+		.grid-3 { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 12px; }
+		@media (max-width: 900px) {
+			.layout { grid-template-columns: 1fr; }
+			.nav { position: relative; height: auto; max-height: none; }
+			.grid-2, .grid-3 { grid-template-columns: 1fr; }
+		}
+		.card {
+			border: 1px solid var(--border); border-radius: 12px;
+			padding: 14px 16px; background: var(--soft);
+		}
+		.card h3 { margin-top: 0; color: var(--ink); }
+		.tiny { font-size: 12px; color: var(--muted); }
+		.qa {
+			border: 1px solid var(--border); border-radius: 12px;
+			margin: 10px 0; overflow: hidden; background: #fff;
+		}
+		.qa summary {
+			cursor: pointer; padding: 12px 14px; font-weight: 600; font-size: 13.5px;
+			background: var(--soft); list-style: none;
+		}
+		.qa summary::-webkit-details-marker { display: none; }
+		.qa summary::before { content: "Q · "; color: var(--accent); font-weight: 800; }
+		.qa[open] summary { border-bottom: 1px solid var(--border); }
+		.qa .ans { padding: 12px 14px; font-size: 13.5px; }
+		.qa .ans::before {
+			content: "A · "; color: var(--info); font-weight: 800;
+		}
+		.filter-box {
+			display: flex; gap: 10px; flex-wrap: wrap; margin: 12px 0 8px;
+		}
+		.filter-box input {
+			flex: 1; min-width: 200px; padding: 10px 12px; border-radius: 10px;
+			border: 1px solid var(--border); font-size: 14px;
+		}
+		.toc-hint { font-size: 11px; color: #64748b; margin-bottom: 8px; }
+		.mermaid { background: #f8fafc; border-radius: 12px; padding: 12px; margin: 12px 0; }
+		.tag {
+			display: inline-block; font-size: 10px; font-weight: 700;
+			padding: 2px 7px; border-radius: 999px; margin-right: 4px;
+			text-transform: uppercase; letter-spacing: .04em;
+		}
+		.tag.must { background: #dcfce7; color: #166534; }
+		.tag.ml { background: #dbeafe; color: #1e40af; }
+		.tag.ui { background: #fce7f3; color: #9d174d; }
+		.tag.db { background: #fef3c7; color: #92400e; }
+		.hero-meta { font-size: 13px; color: var(--muted); margin-bottom: 8px; }
+		.kicker { font-size: 12px; font-weight: 700; color: #059669; text-transform: uppercase; letter-spacing: .06em; }
+		ul.compact li { margin: 4px 0; }
+		.footer-note {
+			margin-top: 40px; padding-top: 16px; border-top: 1px solid var(--border);
+			font-size: 12px; color: var(--muted);
+		}
+	</style>
+</head>
+<body>
+	<div class="layout">
+		<nav class="nav" id="sideNav">
+			<div class="brand">FarmSense AI</div>
+			<div class="sub">Viva &amp; development reference<br />LD6053 · 25055042</div>
+			<div class="toc-hint">Jump to a section</div>
+			<div class="group">Core</div>
+			<a href="#overview">1. Overview</a>
+			<a href="#problem">2. Problem &amp; aim</a>
+			<a href="#architecture">3. Architecture</a>
+			<a href="#structure">4. File structure</a>
+			<a href="#stack">5. Tech stack &amp; why</a>
+			<div class="group">Data &amp; ML</div>
+			<a href="#database">6. Database</a>
+			<a href="#ml">7. ML pipeline</a>
+			<a href="#why-rf">8. Why Random Forest</a>
+			<a href="#apis">9. APIs &amp; auth</a>
+			<div class="group">Product</div>
+			<a href="#frontend">10. Frontend &amp; UX</a>
+			<a href="#features">11. Key features</a>
+			<a href="#run">12. How to run / demo</a>
+			<a href="#eval">13. Evaluation</a>
+			<a href="#limits">14. Limitations</a>
+			<div class="group">Viva</div>
+			<a href="#viva">15. Viva Q&amp;A bank</a>
+			<a href="#one-liners">16. One-liners</a>
+			<a href="#links">17. Related docs</a>
+		</nav>
+
+		<main class="main">
+			<article class="paper">
+				<div class="paper-inner">
+					<p class="kicker">Undergraduate project reference</p>
+					<h1>FarmSense AI — Viva &amp; Development Guide</h1>
+					<p class="hero-meta">
+						Student: <strong>Savindu Thathsara Beruwala Liyanage</strong> (25055042) ·
+						Northumbria University · LD6053 UG Computing Project
+					</p>
+					<p class="lead">
+						Open this page before your viva. Use the left menu to jump to architecture, database,
+						ML justifications, or the Q&amp;A bank. Answers below match the <em>current codebase</em>
+						(honest demand signals, multi-plan lifecycle, Docker stack) — not only the early proposal.
+					</p>
+					<div class="badge-row">
+						<span class="badge">React + Vite</span>
+						<span class="badge">FastAPI</span>
+						<span class="badge">PostgreSQL 16</span>
+						<span class="badge">Random Forest</span>
+						<span class="badge">LSTM weather/price</span>
+						<span class="badge">District oversupply</span>
+					</div>
+
+					<div class="callout info">
+						<strong>How to use in viva:</strong> Ctrl/Cmd+F for keywords (e.g. “Random Forest”, “oversupply”).
+						Open Q&amp;A details with a click. Keep answers honest about limitations — examiners respect that.
+					</div>
+
+					<!-- 1 -->
+					<h2 id="overview">1. Project overview (30-second pitch)</h2>
+					<p>
+						<strong>FarmSense AI</strong> is a mobile-first web application that helps smallholder / small-scale
+						farmers choose crops using <strong>soil suitability</strong>, <strong>weather fitness</strong>,
+						<strong>price outlook</strong>, and <strong>demand / oversupply signals</strong> — not soil alone.
+						Farmers enter N, P, K, pH (and location), get ranked crop plans with explainable scores, can
+						confirm a plan, set a planted date for harvest/sell reminders, and see district-level overcrowding risk.
+					</p>
+					<div class="grid-3">
+						<div class="card">
+							<h3>Who</h3>
+							<p class="tiny">Smallholders / allotment-scale growers in a UK-focused demo context (GB district + temperate crop filter).</p>
+						</div>
+						<div class="card">
+							<h3>What</h3>
+							<p class="tiny">End-to-end SPA + API + Postgres + trained ML artefacts in Docker.</p>
+						</div>
+						<div class="card">
+							<h3>Gap</h3>
+							<p class="tiny">Most crop ML apps stop at soil/climate. Few join market timing + local oversupply.</p>
+						</div>
+					</div>
+
+					<!-- 2 -->
+					<h2 id="problem">2. Problem, aim, research questions</h2>
+					<h3>Problem</h3>
+					<ul class="compact">
+						<li>Crop choice is often habit-based, not evidence-based.</li>
+						<li>Soil-only recommenders ignore price windows and local gluts.</li>
+						<li>Market / weather data exists (DEFRA, GOV.UK, Open-Meteo) but is hard to use as one decision tool.</li>
+					</ul>
+					<h3>Aim</h3>
+					<p>
+						Design and evaluate an integrated crop-planning system that ranks crops by suitability
+						<em>and</em> short-horizon market/weather context, with oversupply awareness.
+					</p>
+					<h3>Typical research questions (proposal / dissertation)</h3>
+					<ol>
+						<li>Does a multi-layer pipeline (soil + weather + price + demand) change recommendations vs soil-only?</li>
+						<li>Can public search-interest signals add useful demand context (and when do they fail)?</li>
+						<li>Can LSTM forecasts beat simple baselines (e.g. ARIMA) on price series for the project horizon?</li>
+					</ol>
+
+					<!-- 3 -->
+					<h2 id="architecture">3. System architecture</h2>
+					<div class="mermaid">
+flowchart LR
+  U[Farmer browser<br/>React SPA :5173] -->|JWT REST| API[FastAPI :8000]
+  API --> DB[(PostgreSQL :5433)]
+  API --> L1[L1 RF suitability<br/>rf_suitability.pkl]
+  API --> L2[L2 Weather<br/>LSTM + Open-Meteo]
+  API --> L3[L3 Price<br/>LSTM + GOV.UK/Defra]
+  API --> L4[L4 Demand<br/>Trends / Wiki + district]
+  API --> AGG[district_crop_aggregate<br/>oversupply]
+					</div>
+					<p>
+						<strong>Live ranking weights</strong> (in <code>recommendation_service.py</code>):
+						soil <strong>35%</strong> · weather <strong>22%</strong> · price <strong>28%</strong> · demand <strong>15%</strong>.
+						Training notes in <code>metrics_e.json</code> used similar weights (0.35 / 0.20 / 0.30 / 0.15).
+					</p>
+					<div class="callout">
+						Request flow: UI posts soil → API stores <code>soil_reading</code> + creates
+						<code>recommendation_run</code> → ML layers score crops → JSON ranked list returned and
+						persisted in <code>ranked_output</code> (JSONB) → farmer may confirm → district aggregate updates.
+					</div>
+
+					<!-- 4 -->
+					<h2 id="structure">4. File structure (what lives where)</h2>
+					<div class="path-block">farmsense-ai/
+├── frontend/                 # React + Vite + Tailwind SPA
+│   ├── src/pages/            # Landing, Auth, Dashboard, SoilInput, Plans, Market…
+│   ├── src/api/              # HTTP clients + services (+ mock mode)
+│   ├── src/store/            # Zustand: auth, farm, theme, notifications
+│   ├── src/components/       # UI shell, DatePicker, visual panels…
+│   └── src/router/           # Lazy routes, role guards
+├── backend/
+│   ├── app/main.py           # FastAPI routes entry
+│   ├── app/core/             # config, JWT, deps, rate limits
+│   ├── app/db/               # SQLAlchemy models + session
+│   ├── app/services/         # business logic (recommend, demand, lifecycle…)
+│   ├── app/ml/               # RF loader, LSTM inference, pipeline layers
+│   ├── app/schemas/          # Pydantic API models
+│   ├── scripts/              # e.g. live_accuracy_check.py
+│   └── tests/
+├── database/
+│   ├── init.sql              # schema created on first Postgres boot
+│   ├── migrations/           # 001 multi-plans … 004 crop lifecycle
+│   └── database-design-plan.html
+├── ml-models/
+│   ├── artifacts/            # *.pkl, *.h5, metrics_*.json (runtime)
+│   ├── data/                 # training CSVs (suitability, weather, prices…)
+│   ├── notebooks/            # L1–L3 training notebooks
+│   └── ml-data-and-training-guide.html
+├── docker-compose.yml        # Postgres + backend
+├── docs/viva-reference.html  # THIS FILE
+├── resources/                # proposal, diagrams
+└── README.md</div>
+
+					<table class="data">
+						<thead><tr><th>Path</th><th>Remember for viva</th></tr></thead>
+						<tbody>
+							<tr><td><code>recommendation_service.py</code></td><td>Heart of ranking, multi-plan, schedule, confirm</td></tr>
+							<tr><td><code>crop_lifecycle_service.py</code></td><td>Sow → harvest → sell day windows</td></tr>
+							<tr><td><code>demand_signals_service.py</code></td><td>Honest Trends / Wikipedia (no fake scores)</td></tr>
+							<tr><td><code>app/ml/loader.py</code></td><td>Loads RF, predicts suitability</td></tr>
+							<tr><td><code>app/ml/pipeline_layers.py</code></td><td>Weather/price scoring + live blends</td></tr>
+							<tr><td><code>init.sql</code></td><td>Canonical schema for examiners</td></tr>
+							<tr><td><code>rf_suitability.pkl</code></td><td>Deployed L1 model artefact</td></tr>
+						</tbody>
+					</table>
+
+					<!-- 5 -->
+					<h2 id="stack">5. Technology stack — and why each choice</h2>
+					<table class="data">
+						<thead><tr><th>Layer</th><th>Choice</th><th>Why (viva answer)</th></tr></thead>
+						<tbody>
+							<tr>
+								<td>Frontend</td>
+								<td>React + Vite + Tailwind + Zustand</td>
+								<td>Fast SPA for mobile-first UI; Vite for quick builds; Zustand is lighter than Redux for auth/farm state; Tailwind for consistent utility styling.</td>
+							</tr>
+							<tr>
+								<td>Backend</td>
+								<td>FastAPI + Uvicorn + Pydantic</td>
+								<td>Python ecosystem matches scikit-learn / TensorFlow; auto OpenAPI docs (<code>/docs</code>); typed validation; async-friendly for I/O.</td>
+							</tr>
+							<tr>
+								<td>ORM / DB</td>
+								<td>SQLAlchemy 2 + PostgreSQL 16</td>
+								<td>Relational integrity for users/farms/plans/aggregates; JSONB for ranked ML payloads; Docker image <code>postgres:16-alpine</code>.</td>
+							</tr>
+							<tr>
+								<td>Auth</td>
+								<td>JWT (HS256) + bcrypt</td>
+								<td>Stateless API auth for SPA; bcrypt for password hashes; roles <code>farmer</code> / <code>admin</code>.</td>
+							</tr>
+							<tr>
+								<td>Containers</td>
+								<td>Docker Compose</td>
+								<td>Reproducible demo: same DB + API + mounted ML artefacts on any machine.</td>
+							</tr>
+							<tr>
+								<td>ML — soil</td>
+								<td>scikit-learn Random Forest</td>
+								<td>Strong tabular classifier; interpretable feature importance; high accuracy on Crop_recommendation.csv; easy to ship as <code>.pkl</code>.</td>
+							</tr>
+							<tr>
+								<td>ML — time series</td>
+								<td>LSTM (TensorFlow) vs ARIMA baseline</td>
+								<td>Literature supports LSTM for non-linear weather/price series; ARIMA kept as baseline (price MAPE comparison in metrics).</td>
+							</tr>
+							<tr>
+								<td>External data</td>
+								<td>Open-Meteo, GOV.UK/Defra, Google Trends, Wikipedia</td>
+								<td>Free / open sources fit student budget; UK price indices are authoritative for GB context.</td>
+							</tr>
+							<tr>
+								<td>Email</td>
+								<td>Resend (optional)</td>
+								<td>Forgot-password without running a mail server; degrades gracefully if key missing.</td>
+							</tr>
+							<tr>
+								<td>Rate limits</td>
+								<td>SlowAPI</td>
+								<td>Protect auth and heavy endpoints from abuse during demos.</td>
+							</tr>
+						</tbody>
+					</table>
+					<div class="callout warn">
+						<strong>Heavy vs light ML:</strong> Compose sets <code>ML_HEAVY=true</code> so TensorFlow LSTMs load.
+						If heavy mode is off, the API falls back to lighter trend/climate heuristics so the app still runs.
+					</div>
+
+					<!-- 6 -->
+					<h2 id="database">6. Database design</h2>
+					<p class="tiny">Source of truth: <code>database/init.sql</code> · ORM mirror: <code>backend/app/db/models.py</code> · Design notes: <code>database/database-design-plan.html</code></p>
+					<div class="mermaid">
+erDiagram
+  user_account ||--o{ farm_profile : owns
+  user_account ||--o{ password_reset_token : has
+  farm_profile ||--o{ soil_reading : records
+  farm_profile ||--o{ recommendation_run : generates
+  soil_reading ||--o{ recommendation_run : informs
+  recommendation_run ||--o{ confirmed_crop_plan : may_confirm
+  crop_reference ||--o{ confirmed_crop_plan : crop
+  crop_reference ||--o{ district_crop_aggregate : tallied
+  crop_reference ||--o{ oversupply_alert : warned
+  crop_reference ||--o{ market_snapshot : priced
+					</div>
+					<table class="data">
+						<thead><tr><th>Table</th><th>Purpose</th></tr></thead>
+						<tbody>
+							<tr><td><code>user_account</code></td><td>Email, password_hash, role, <code>simple_mode</code>, <code>demo_data_mode</code></td></tr>
+							<tr><td><code>farm_profile</code></td><td>District, country (default GB), area</td></tr>
+							<tr><td><code>crop_reference</code></td><td>Canonical crops + lifecycle day columns (harvest/sell windows)</td></tr>
+							<tr><td><code>soil_reading</code></td><td>N,P,K,pH (+ optional climate), preferences JSONB</td></tr>
+							<tr><td><code>recommendation_run</code></td><td>One “plan” per generation: title + <code>ranked_output</code> JSONB + explainability</td></tr>
+							<tr><td><code>confirmed_crop_plan</code></td><td>Farmer lock-in → feeds district aggregates</td></tr>
+							<tr><td><code>district_crop_aggregate</code></td><td>plan_count per district/crop/period for oversupply</td></tr>
+							<tr><td><code>oversupply_alert</code></td><td>Stored risk levels (low/medium/high)</td></tr>
+							<tr><td><code>market_snapshot</code></td><td>Cached market/price/demand fields</td></tr>
+							<tr><td><code>idempotency_record</code></td><td>Safe POST retries</td></tr>
+							<tr><td><code>password_reset_token</code></td><td>Forgot-password flow</td></tr>
+						</tbody>
+					</table>
+					<h3>Why JSONB for <code>ranked_output</code>?</h3>
+					<p>
+						ML outputs are nested (crops, factor scores, planting windows, planted date, sources).
+						JSONB keeps schema flexible while still queryable, without dozens of child tables for every UI field.
+						Core relational facts (who, farm, confirmations, aggregates) stay normalised.
+					</p>
+					<h3>Migrations</h3>
+					<ul class="compact">
+						<li><code>001_multi_plans.sql</code> — plan titles / multi-run support</li>
+						<li><code>004_crop_lifecycle.sql</code> — days_to_harvest / days_to_sell on crops</li>
+						<li>(others) preference flags and incremental upgrades for existing DBs</li>
+					</ul>
+
+					<!-- 7 -->
+					<h2 id="ml">7. ML &amp; signal pipeline (L1–L4)</h2>
+					<table class="data">
+						<thead>
+							<tr><th>Layer</th><th>Method</th><th>Artefact / source</th><th>Reported metric</th></tr>
+						</thead>
+						<tbody>
+							<tr>
+								<td><span class="tag ml">L1</span> Soil suitability</td>
+								<td>Random Forest classifier</td>
+								<td><code>rf_suitability.pkl</code> · Crop_recommendation.csv</td>
+								<td>~<strong>97.5%</strong> accuracy, F1≈0.975 (<code>metrics_a.json</code>), NFR ≥85% pass</td>
+							</tr>
+							<tr>
+								<td><span class="tag ml">L2</span> Weather</td>
+								<td>LSTM + live Open-Meteo agri blend</td>
+								<td><code>lstm_weather.h5</code>, <code>scaler_weather.pkl</code></td>
+								<td>MAE ≈2.58°C, RMSE ≈3.67°C on weekly UK mean temp (<code>metrics_c.json</code>)</td>
+							</tr>
+							<tr>
+								<td><span class="tag ml">L3</span> Price</td>
+								<td>LSTM (+ ARIMA baseline in training); prefer GOV.UK indices at serve</td>
+								<td><code>lstm_price.h5</code>, Defra/GOV.UK CSVs</td>
+								<td>LSTM MAPE <strong>4.96%</strong> vs ARIMA <strong>9.55%</strong> (<code>metrics_b.json</code>)</td>
+							</tr>
+							<tr>
+								<td><span class="tag ml">L4</span> Demand</td>
+								<td>District planting share + Google Trends (GB) + Wikipedia pageviews fallback</td>
+								<td>Live APIs (cached ~12h); NLP experiment in metrics_d</td>
+								<td>Be honest: Trends↔price correlation often weak; UI says “unavailable” rather than inventing scores</td>
+							</tr>
+							<tr>
+								<td><span class="tag ml">L5</span> Ranking research</td>
+								<td>XGBRegressor (training)</td>
+								<td><code>ranking_model.pkl</code>, <code>metrics_e.json</code></td>
+								<td>Live app uses weighted formula in Python (not solely the XGB file)</td>
+							</tr>
+						</tbody>
+					</table>
+					<h3>UK crop filter</h3>
+					<p>
+						For GB farms, tropical RF classes (e.g. rice/banana if present in the training set) are
+						down-weighted or filtered so recommendations stay temperate-relevant.
+					</p>
+					<h3>Oversupply</h3>
+					<p>
+						Confirmed plans increment <code>district_crop_aggregate</code>. Risk rises when many farmers in the
+						same district lock the same crop (threshold configurable, default around 100 plans).
+						Shown on community / ranking paths — this is the “don’t all plant the same thing” feature.
+					</p>
+
+					<!-- 8 -->
+					<h2 id="why-rf">8. Why Random Forest (and why LSTM elsewhere)</h2>
+					<div class="grid-2">
+						<div class="card">
+							<h3>Why Random Forest for soil?</h3>
+							<ul class="compact">
+								<li><strong>Tabular data:</strong> N,P,K,pH, temperature, humidity, rainfall suit tree ensembles.</li>
+								<li><strong>Accuracy:</strong> Literature + this project’s test set (~97.5%) beat the ≥85% NFR.</li>
+								<li><strong>Robustness:</strong> Less prone to overfitting than a single deep tree; handles mixed feature scales.</li>
+								<li><strong>Deployability:</strong> One <code>.pkl</code> via joblib — no GPU needed for inference.</li>
+								<li><strong>Explainability:</strong> Feature importance supports “why this crop?” narratives.</li>
+							</ul>
+						</div>
+						<div class="card">
+							<h3>Why not RF for price/weather?</h3>
+							<ul class="compact">
+								<li>Price and weather are <strong>sequences</strong> — order matters.</li>
+								<li><strong>LSTM</strong> captures temporal dependence; ARIMA is the classical baseline.</li>
+								<li>Project result: LSTM price MAPE lower than ARIMA on held-out series.</li>
+								<li>At serve time, official GOV.UK/Defra indices can override/blend so farmers see UK-grounded prices.</li>
+							</ul>
+						</div>
+					</div>
+					<div class="callout">
+						<strong>Short viva line:</strong>
+						“Random Forest for static soil–climate suitability; LSTM for time-series weather and price;
+						public demand signals and district counts for market crowding — then a weighted rank.”
+					</div>
+					<h3>Alternatives considered (say this if asked)</h3>
+					<ul class="compact">
+						<li>SVM / k-NN for soil — common in papers but RF usually stronger/more stable on this dataset style.</li>
+						<li>ARIMA-only price — simpler but worse MAPE here; kept as baseline.</li>
+						<li>Paid market APIs — rejected for cost; open UK sources preferred.</li>
+						<li>Reddit NLP as primary demand — proposed early; production prioritises Trends + Wikipedia and refuses fake scores when APIs fail.</li>
+					</ul>
+
+					<!-- 9 -->
+					<h2 id="apis">9. Backend APIs &amp; auth</h2>
+					<table class="data">
+						<thead><tr><th>Area</th><th>Endpoints (summary)</th></tr></thead>
+						<tbody>
+							<tr><td>Health</td><td><code>GET /health</code>, <code>GET /health/ready</code> (DB + ML layers)</td></tr>
+							<tr><td>Auth</td><td>register, login, forgot/reset password, <code>GET /auth/me</code>, preferences PATCH</td></tr>
+							<tr><td>Soil / recommend</td><td><code>POST /soil</code>, recommendations generation paths</td></tr>
+							<tr><td>Plans</td><td><code>GET /plans</code>, overview, get/patch/delete plan, confirm, <code>PATCH …/schedule</code></td></tr>
+							<tr><td>Farmer</td><td>dashboard, market, community</td></tr>
+							<tr><td>Admin</td><td>overview, analytics, farmers, model lab status/test</td></tr>
+							<tr><td>ML utils</td><td>predict suitability, rank, oversupply check</td></tr>
+						</tbody>
+					</table>
+					<p>
+						Interactive docs while API runs: <a href="http://localhost:8000/docs" target="_blank" rel="noreferrer">http://localhost:8000/docs</a>
+					</p>
+					<h3>Auth details to remember</h3>
+					<ul class="compact">
+						<li>Bearer JWT after login; frontend stores token (Zustand persist).</li>
+						<li>Only <strong>401/403</strong> should clear the session — rate-limit <strong>429</strong> on <code>/auth/me</code> must not log the user out.</li>
+						<li>Admin routes use <code>require_admin</code>.</li>
+					</ul>
+
+					<!-- 10 -->
+					<h2 id="frontend">10. Frontend structure &amp; UX</h2>
+					<table class="data">
+						<thead><tr><th>Route / page</th><th>Role</th></tr></thead>
+						<tbody>
+							<tr><td><code>/</code> Landing</td><td>Marketing / entry</td></tr>
+							<tr><td>Login / Register / Forgot / Reset</td><td>Auth</td></tr>
+							<tr><td><code>/dashboard</code></td><td>Summary of plans, sell windows, signals</td></tr>
+							<tr><td><code>/plan</code> SoilInput</td><td>Enter soil → generate plan</td></tr>
+							<tr><td><code>/plans</code>, <code>/plans/:id</code></td><td>Multi-plan list + Recommendations detail + plant date</td></tr>
+							<tr><td>Market / Community / Settings / Help</td><td>Prices, oversupply community, prefs, guide</td></tr>
+							<tr><td><code>/admin/*</code></td><td>Farmers, analytics, model lab</td></tr>
+						</tbody>
+					</table>
+					<p>
+						State: <code>authStore</code>, <code>farmStore</code>, <code>themeStore</code>, <code>notificationStore</code>.
+						API layer under <code>frontend/src/api/</code> with optional <code>VITE_USE_MOCK_API</code> for offline UI.
+					</p>
+
+					<!-- 11 -->
+					<h2 id="features">11. Key product features (demo talking points)</h2>
+					<div class="grid-2">
+						<div class="card">
+							<h3><span class="tag must">Must</span> Multi-layer recommendations</h3>
+							<p class="tiny">Soil RF + weather + price + demand → ranked crops with factor breakdown text.</p>
+						</div>
+						<div class="card">
+							<h3><span class="tag must">Must</span> Multi-plan</h3>
+							<p class="tiny">Each generation is a titled <code>recommendation_run</code>; rename/delete/confirm independently.</p>
+						</div>
+						<div class="card">
+							<h3><span class="tag ui">UX</span> Planted date → calendar</h3>
+							<p class="tiny">Optional planted date (or plan generated date) drives harvest/sell reminders via lifecycle service.</p>
+						</div>
+						<div class="card">
+							<h3><span class="tag must">Must</span> District oversupply</h3>
+							<p class="tiny">Confirmations aggregate by district/crop; risk shown so farmers avoid local gluts.</p>
+						</div>
+						<div class="card">
+							<h3><span class="tag ui">UX</span> Simple mode</h3>
+							<p class="tiny">Preference reduces UI density/copy complexity for less technical users.</p>
+						</div>
+						<div class="card">
+							<h3><span class="tag ui">UX</span> Demo data mode</h3>
+							<p class="tiny">Tagged demo market/community content when live feeds are thin — clearly labelled.</p>
+						</div>
+						<div class="card">
+							<h3><span class="tag ml">ML</span> Honest demand</h3>
+							<p class="tiny">If Trends fails, try Wikipedia; else show unavailable — never invent a Trends score.</p>
+						</div>
+						<div class="card">
+							<h3><span class="tag db">Admin</span> Model lab</h3>
+							<p class="tiny">Admin can inspect layer status / run tests for viva demonstration of ops awareness.</p>
+						</div>
+					</div>
+
+					<!-- 12 -->
+					<h2 id="run">12. How to run (demo checklist)</h2>
+					<div class="path-block">cd farmsense-ai
+docker compose up -d --build
+
+cd frontend
+cp .env.example .env   # VITE_USE_MOCK_API=false
+npm install && npm run dev</div>
+					<table class="data">
+						<thead><tr><th>Service</th><th>Port</th><th>URL</th></tr></thead>
+						<tbody>
+							<tr><td>PostgreSQL</td><td>5433</td><td><code>localhost:5433</code> (db <code>farmsense</code>)</td></tr>
+							<tr><td>FastAPI</td><td>8000</td><td><a href="http://localhost:8000/docs">http://localhost:8000/docs</a></td></tr>
+							<tr><td>Frontend</td><td>5173</td><td><a href="http://localhost:5173">http://localhost:5173</a></td></tr>
+						</tbody>
+					</table>
+					<div class="callout">
+						<strong>Demo path:</strong> Register/login → enter soil on Plan → open Recommendations →
+						set “I planted on” → confirm crop → show Community oversupply / Dashboard sell window →
+						optional Admin model status.
+					</div>
+
+					<!-- 13 -->
+					<h2 id="eval">13. Evaluation &amp; testing</h2>
+					<ul class="compact">
+						<li><strong>Model metrics:</strong> <code>ml-models/artifacts/metrics_*.json</code> (accuracy, MAPE, MAE).</li>
+						<li><strong>Live check script:</strong> <code>backend/scripts/live_accuracy_check.py</code> — artefacts + Open-Meteo sanity.</li>
+						<li><strong>API tests:</strong> <code>backend/tests/</code> (pytest).</li>
+						<li><strong>Ready probe:</strong> <code>/health/ready</code> proves DB + ML load for examiners.</li>
+						<li><strong>Usability:</strong> Simple mode, mobile-first layout, Help guide — qualitative assessment in dissertation.</li>
+					</ul>
+
+					<!-- 14 -->
+					<h2 id="limits">14. Limitations (say these confidently)</h2>
+					<ul class="compact">
+						<li>Soil training set is a public crop-recommendation dataset — not UK farm soil lab results.</li>
+						<li>RF classes include non-UK crops; mitigated by GB filters, not by retraining on UK-only labels.</li>
+						<li>Demand (Trends) is a <em>proxy</em> for interest, not confirmed purchase volume; correlation with price can be weak.</li>
+						<li>LSTM horizons are short (weeks); not a full agronomic DSS.</li>
+						<li>Oversupply depends on users confirming plans in-app — cold start if few users.</li>
+						<li>Email reset needs Resend key; without it, reset is limited.</li>
+						<li>Not financial advice — decision support only.</li>
+					</ul>
+
+					<!-- 15 -->
+					<h2 id="viva">15. Viva Q&amp;A bank</h2>
+					<p class="lead">Search questions below. Click a row to expand the answer.</p>
+					<div class="filter-box">
+						<input id="qaFilter" type="search" placeholder="Filter questions (e.g. Random Forest, Docker, ethics)…" />
+					</div>
+					<div id="qaList">
+
+						<details class="qa" data-tags="intro pitch what"><summary>What is FarmSense AI in one minute?</summary>
+							<div class="ans">A full-stack crop planning app: farmers enter soil and location; a Random Forest scores suitability; weather and price layers (LSTM + open UK/weather data) and demand/oversupply signals adjust ranking; results are stored as plans in PostgreSQL via FastAPI, shown in a React SPA.</div>
+						</details>
+
+						<details class="qa" data-tags="problem motivation why"><summary>Why is this project needed?</summary>
+							<div class="ans">Smallholders often choose crops by habit. Soil-only ML tools ignore market timing and local gluts. Open UK price and weather data exist but are not joined into one farmer-facing decision flow. FarmSense AI bridges that gap.</div>
+						</details>
+
+						<details class="qa" data-tags="contribution novelty"><summary>What is your main contribution?</summary>
+							<div class="ans">An integrated multi-layer ranking pipeline (soil + weather + price + demand) with district oversupply awareness and explainable UI — not just another soil classifier. Also an end-to-end deployable system (Docker + SPA), not only notebooks.</div>
+						</details>
+
+						<details class="qa" data-tags="architecture stack"><summary>Walk me through the architecture.</summary>
+							<div class="ans">Browser React app talks REST/JWT to FastAPI. FastAPI uses SQLAlchemy against PostgreSQL. On recommend, it loads rf_suitability.pkl, scores weather/price layers (LSTM + Open-Meteo / GOV.UK), blends demand and district aggregates, writes recommendation_run.ranked_output JSONB, returns ranked crops to the UI.</div>
+						</details>
+
+						<details class="qa" data-tags="random forest ml soil why"><summary>Why did you choose Random Forest?</summary>
+							<div class="ans">Soil features are tabular; RF handles non-linear interactions without heavy preprocessing, performed ~97.5% accuracy on the held-out suitability set (above 85% NFR), ships as a small pickle for CPU inference, and gives feature-importance style explanations. SVM/k-NN are common alternatives but RF was stronger/stabler for this use case.</div>
+						</details>
+
+						<details class="qa" data-tags="lstm arima price weather"><summary>Why LSTM for weather and price?</summary>
+							<div class="ans">Those are time series. LSTM captures temporal patterns better than treating weeks as independent rows. Literature often prefers LSTM/GRU over classical ARIMA for agricultural prices; in this project LSTM price MAPE beat ARIMA (~4.96% vs ~9.55%). Weather LSTM is blended with live Open-Meteo for current conditions.</div>
+						</details>
+
+						<details class="qa" data-tags="weights ranking score"><summary>How do you combine the layers into one score?</summary>
+							<div class="ans">Weighted confidence ≈ 0.35×soil + 0.22×weather + 0.28×price + 0.15×demand (capped), then profit-style ranking for display order. Weights reflect that soil fitness is foundational but market/price matter for the project’s aim. Training also explored XGB ranking (metrics_e).</div>
+						</details>
+
+						<details class="qa" data-tags="demand trends reddit nlp honest"><summary>You mentioned NLP / Reddit / Trends — what actually ships?</summary>
+							<div class="ans">Early proposal explored NLP/Reddit. The live product prioritises free Google Trends (GB) with Wikipedia pageviews fallback, plus district planting share. If signals fail, the UI shows unavailable rather than fabricating demand. An NLP experiment remains in metrics_d for the research trail.</div>
+						</details>
+
+						<details class="qa" data-tags="oversupply district"><summary>How does oversupply detection work?</summary>
+							<div class="ans">When a farmer confirms a crop plan, counts update in district_crop_aggregate. High local counts raise risk (low/medium/high). That risk influences messaging and can affect ranking so the system discourages everyone planting the same crop in one district.</div>
+						</details>
+
+						<details class="qa" data-tags="database schema jsonb"><summary>Why PostgreSQL and why JSONB?</summary>
+							<div class="ans">Users, farms, soil readings, and confirmations need relational integrity and aggregation. Ranked ML payloads are nested and evolve with the UI, so ranked_output JSONB stores flexible plan detail without constant schema migrations, while foreign keys keep the core model clean.</div>
+						</details>
+
+						<details class="qa" data-tags="fastapi python why backend"><summary>Why FastAPI instead of Node/Django?</summary>
+							<div class="ans">ML stack is Python (scikit-learn, TensorFlow). FastAPI keeps inference and API in one language, gives automatic OpenAPI docs for demos, and Pydantic validation. Django would be heavier for a JSON API; Node would force a second language around model loading.</div>
+						</details>
+
+						<details class="qa" data-tags="react zustand frontend"><summary>Why React and Zustand?</summary>
+							<div class="ans">React fits a rich SPA (dashboard, plans, charts). Zustand is a small persisted store for auth token and farm/plan state — enough without Redux boilerplate. Vite speeds local development for iterative UI work.</div>
+						</details>
+
+						<details class="qa" data-tags="docker ports demo"><summary>How do you run and demonstrate the system?</summary>
+							<div class="ans">docker compose up builds Postgres on 5433 and API on 8000 with ML artefacts mounted. npm run dev serves the SPA on 5173 with VITE_API_BASE_URL pointing at the API. Show /health/ready, then soil → recommendations → plant date → confirm → community/dashboard.</div>
+						</details>
+
+						<details class="qa" data-tags="security auth jwt"><summary>How is security handled?</summary>
+							<div class="ans">Passwords hashed with bcrypt; sessions via JWT Bearer tokens; role checks for admin; SlowAPI rate limits; idempotency keys on sensitive POSTs; CORS configured for the SPA origin. Password reset tokens stored server-side; email via Resend when configured.</div>
+						</details>
+
+						<details class="qa" data-tags="planted date lifecycle schedule"><summary>Explain the planted-date / harvest schedule feature.</summary>
+							<div class="ans">crop_reference stores days_to_harvest and days_to_sell ranges. crop_lifecycle_service computes windows from a planted date (user-set via PATCH /plans/{id}/schedule) or falls back to plan generated date. Dashboard/recommendations show concrete sell windows instead of hardcoded week labels.</div>
+						</details>
+
+						<details class="qa" data-tags="simple mode demo mode accessibility"><summary>What are Simple mode and Demo mode?</summary>
+							<div class="ans">Simple mode reduces UI complexity for less technical users (preference on user_account). Demo data mode can show clearly tagged sample market/community data when live feeds are sparse — so demos stay honest.</div>
+						</details>
+
+						<details class="qa" data-tags="evaluation metrics nfr testing"><summary>How did you evaluate success?</summary>
+							<div class="ans">Against NFRs: RF accuracy ≥85% (achieved ~97.5%); price MAPE target &lt;15% (LSTM ~4.96%). Weather MAE/RMSE reported. Scenario checks in metrics_e compare full pipeline vs soil-only. Plus API tests, health/ready, and qualitative usability via Simple mode / mobile layout.</div>
+						</details>
+
+						<details class="qa" data-tags="limitations ethics bias"><summary>What are the main limitations and ethical issues?</summary>
+							<div class="ans">Training data is not UK soil labs; demand proxies aren’t purchases; cold-start oversupply; forecasts can be wrong. Ethically: decision support not advice; avoid overclaiming certainty; protect credentials; label demo data; don’t fabricate market signals. Consider bias if RF was trained on non-local crops.</div>
+						</details>
+
+						<details class="qa" data-tags="uk filter tropical crops"><summary>Your RF was trained on global crops — how do you handle UK use?</summary>
+							<div class="ans">For GB country_code, ranking prefers UK-focus classes and down-weights tropical labels so rice/banana-style suggestions don’t dominate temperate farms. It’s a pragmatic filter; ideal future work is UK-labelled training data.</div>
+						</details>
+
+						<details class="qa" data-tags="methodology agile waterfall"><summary>What development methodology did you use?</summary>
+							<div class="ans">Iterative / agile-style: proposal → schema → ML notebooks → API → UI → integration → refinement (multi-plan, lifecycle, honest demand). Docker for reproducible environments. Requirements MoSCoW from the proposal guided priorities.</div>
+						</details>
+
+						<details class="qa" data-tags="future work improve"><summary>If you had more time, what would you improve?</summary>
+							<div class="ans">UK-specific soil/crop dataset; stronger causal demand models; more robust cold-start oversupply; field trials with real farmers; CI/CD; perhaps lighter ONNX export instead of TensorFlow in Docker; accessibility audit and more automated E2E tests.</div>
+						</details>
+
+						<details class="qa" data-tags="files where code"><summary>Where is the recommendation logic in the repo?</summary>
+							<div class="ans">Primary: backend/app/services/recommendation_service.py. ML load: app/ml/loader.py. Layer scoring: app/ml/pipeline_layers.py and lstm_inference.py. Demand: demand_signals_service.py. Lifecycle: crop_lifecycle_service.py. Schema: database/init.sql.</div>
+						</details>
+
+						<details class="qa" data-tags="admin model lab"><summary>What can an admin do?</summary>
+							<div class="ans">View overview/analytics, manage/list farmers, inspect model layer status and run lab tests — useful to show examiners that ML health is observable, not a black box only on the farmer UI.</div>
+						</details>
+
+						<details class="qa" data-tags="data sources govuk open-meteo defra"><summary>What external data sources do you use?</summary>
+							<div class="ans">Open-Meteo for live weather/agri indicators; GOV.UK / Defra-related price indices for UK market context; Google Trends and Wikipedia pageviews for demand interest; Nominatim/postcodes.io on the frontend for location helpers.</div>
+						</details>
+
+						<details class="qa" data-tags="confirm plan multi plan"><summary>What happens when a farmer confirms a plan?</summary>
+							<div class="ans">A confirmed_crop_plan row links the recommendation_run to a crop; district aggregates update; oversupply risk can change for that district/crop. The farmer keeps multi-plan history; confirmation is the signal that feeds community crowding logic.</div>
+						</details>
+
+						<details class="qa" data-tags="rate limit 429 logout bug"><summary>Did you hit any notable bugs and how did you fix them?</summary>
+							<div class="ans">Example: treating /auth/me HTTP 429 as logout cleared sessions during rate limiting — fixed by only clearing on 401/403. Layout issues on Recommendations (nested scroll / sticky aside) were fixed by adjusting overflow and sticky positioning rather than nested scroll containers.</div>
+						</details>
+
+						<details class="qa" data-tags="research questions rq"><summary>Did your results support the research questions?</summary>
+							<div class="ans">RQ1: metrics_e scenarios show cases where full pipeline score differs from soil-only (not always “wins,” which is itself a honest finding). RQ2: Trends–price correlation in metrics_d was often non-significant — so demand is treated cautiously. RQ3: LSTM beat ARIMA on price MAPE in metrics_b.</div>
+						</details>
+
+						<details class="qa" data-tags="gdpr privacy personal data"><summary>How do you handle personal data / GDPR-minded design?</summary>
+							<div class="ans">Store minimal account data (email, hashed password, farm district). JWT sessions rather than sharing passwords. No need to store raw soil indefinitely beyond what’s needed for plans. Password reset tokens expire. For a real deployment you’d add retention policy, export/delete, and DPIA — student demo keeps scope small.</div>
+						</details>
+
+						<details class="qa" data-tags="nfr performance accuracy"><summary>What non-functional requirements did you target?</summary>
+							<div class="ans">Examples: RF accuracy ≥85%; price forecast MAPE under 15%; usable mobile-first UI; API health checks; rate limiting; Docker reproducibility. Exact wording lives in the proposal/dissertation NFR tables.</div>
+						</details>
+
+						<details class="qa" data-tags="explainability black box"><summary>Is the system a black box?</summary>
+							<div class="ans">Not entirely: UI shows factor breakdown (soil/weather/price/demand percentages and plain-language blurbs). RF is more interpretable than deep nets for soil. LSTMs are less transparent, so we report metrics and blend with official price indices where possible.</div>
+						</details>
+
+					</div>
+
+					<!-- 16 -->
+					<h2 id="one-liners">16. Emergency one-liners</h2>
+					<table class="data">
+						<thead><tr><th>Topic</th><th>Say this</th></tr></thead>
+						<tbody>
+							<tr><td>Elevator</td><td>“Soil alone isn’t enough — we rank crops with weather, price, demand, and local oversupply.”</td></tr>
+							<tr><td>RF</td><td>“Best fit for tabular soil features; ~97.5% test accuracy; easy to deploy.”</td></tr>
+							<tr><td>LSTM</td><td>“Time series need memory; LSTM beat ARIMA on our price MAPE.”</td></tr>
+							<tr><td>Stack</td><td>“React SPA, FastAPI, Postgres, Docker — Python because of the ML.”</td></tr>
+							<tr><td>Honesty</td><td>“If demand data is down, we say so — we don’t invent Trends.”</td></tr>
+							<tr><td>Limit</td><td>“Decision support, not agronomic or financial advice; dataset isn’t UK lab soil.”</td></tr>
+						</tbody>
+					</table>
+
+					<!-- 17 -->
+					<h2 id="links">17. Related documentation in the repo</h2>
+					<ul class="compact">
+						<li><code>README.md</code> — quick start</li>
+						<li><code>database/database-design-plan.html</code> — deeper DB plan</li>
+						<li><code>ml-models/ml-data-and-training-guide.html</code> — training data guide</li>
+						<li><code>UI_DESIGN_SYSTEM.md</code> — UI notes</li>
+						<li><code>frontend/public/help-guide.html</code> — in-app style help</li>
+						<li><code>resources/LD6053Proposal_…</code> — original proposal</li>
+						<li>Dissertation HTML under <code>Dissertation preparation/</code> (outside this folder)</li>
+					</ul>
+
+					<div class="footer-note">
+						Generated as a viva prep aid for FarmSense AI · Open locally in any browser ·
+						File: <code>farmsense-ai/docs/viva-reference.html</code> ·
+						Verify live metrics in <code>ml-models/artifacts/metrics_*.json</code> before quoting numbers in the exam.
+					</div>
+				</div>
+			</article>
+		</main>
+	</div>
+
+	<script>
+		mermaid.initialize({ startOnLoad: true, theme: "neutral", securityLevel: "loose" });
+
+		const filter = document.getElementById("qaFilter");
+		const items = [...document.querySelectorAll("#qaList .qa")];
+		filter.addEventListener("input", () => {
+			const q = filter.value.trim().toLowerCase();
+			items.forEach((el) => {
+				const text = (el.innerText + " " + (el.dataset.tags || "")).toLowerCase();
+				el.style.display = !q || text.includes(q) ? "" : "none";
+			});
+		});
+
+		const links = [...document.querySelectorAll(".nav a")];
+		const sections = links.map((a) => document.querySelector(a.getAttribute("href"))).filter(Boolean);
+		const sync = () => {
+			let current = sections[0];
+			for (const s of sections) {
+				if (s.getBoundingClientRect().top <= 80) current = s;
+			}
+			links.forEach((a) => a.classList.toggle("active", a.getAttribute("href") === "#" + current.id));
+		};
+		window.addEventListener("scroll", sync, { passive: true });
+		sync();
+	</script>
+</body>
+</html>

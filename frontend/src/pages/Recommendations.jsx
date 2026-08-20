@@ -16,6 +16,7 @@ import {
 } from 'lucide-react'
 import { PageWrapper } from '../components/layout/PageWrapper'
 import { Button } from '../components/ui/Button'
+import { DatePicker, isValidIsoDate, isoDateInRange } from '../components/ui/DatePicker'
 import { Modal } from '../components/ui/Modal'
 import { SkeletonDashboard } from '../components/ui/Skeleton'
 import { DemoTag } from '../components/shared/DemoTag'
@@ -24,6 +25,7 @@ import { CropCard } from '../components/shared/CropCard'
 import {
   RecommendationsHero,
   RecommendationsVisualPanel,
+  PLAN_ASIDE_RIGHT_CLASS,
 } from '../components/shared/RecommendationsVisualPanel'
 import { SuitabilityBar } from '../components/charts/SuitabilityBar'
 import { useRecommendations } from '../hooks/useMockData'
@@ -31,7 +33,7 @@ import { useFarmStore } from '../store/farmStore'
 import { useSimpleMode } from '../hooks/useSimpleMode'
 import { useToast } from '../hooks/useToast'
 import { recommendationsService, getErrorMessage, apiConfig } from '../api'
-import { formatCurrency, formatShortDate } from '../lib/utils'
+import { formatCurrency, formatShortDate, cn } from '../lib/utils'
 
 const FACTOR_META = {
   soil: { icon: Droplets, fallbackTitle: 'Soil status' },
@@ -100,6 +102,11 @@ export default function Recommendations() {
     finalizedAt,
     planId: loadedPlanId,
     title: planTitle,
+    plantedDate: plantedDateFromServer,
+    effectivePlantedDate,
+    generatedPlantedDate,
+    plantedDateSource,
+    reminders: remindersFromServer,
   } = useRecommendations(routePlanId)
   const planId = routePlanId || loadedPlanId
   const selectedCrops = useFarmStore((s) => s.selectedCrops)
@@ -108,16 +115,59 @@ export default function Recommendations() {
   const confirmCropPlan = useFarmStore((s) => s.confirmCropPlan)
   const cropPlanConfirmedAt = useFarmStore((s) => s.cropPlanConfirmedAt)
   const setActivePlanId = useFarmStore((s) => s.setActivePlanId)
+  const notifications = useFarmStore((s) => s.notifications)
 
   const [confirming, setConfirming] = useState(false)
   const [deleting, setDeleting] = useState(false)
   const [showDeleteModal, setShowDeleteModal] = useState(false)
+  const [plantedDate, setPlantedDate] = useState('')
+  const [savingSchedule, setSavingSchedule] = useState(false)
+  const [dateTouched, setDateTouched] = useState(false)
+
+  const plantDateMin = useMemo(() => {
+    const d = new Date()
+    d.setFullYear(d.getFullYear() - 2)
+    return d
+  }, [])
+  const plantDateMax = useMemo(() => new Date(), [])
+
+  const baselinePlantedDate = useMemo(() => {
+    const stored = plantedDateFromServer ? String(plantedDateFromServer).slice(0, 10) : ''
+    if (stored) return stored
+    const effective = effectivePlantedDate ? String(effectivePlantedDate).slice(0, 10) : ''
+    if (effective) return effective
+    const generated = generatedPlantedDate ? String(generatedPlantedDate).slice(0, 10) : ''
+    if (generated) return generated
+    return runDate ? String(runDate).slice(0, 10) : ''
+  }, [plantedDateFromServer, effectivePlantedDate, generatedPlantedDate, runDate])
+
+  const dateError = useMemo(() => {
+    if (!dateTouched && !plantedDate) return ''
+    if (!plantedDate) return 'Pick the day you planted.'
+    if (!isValidIsoDate(plantedDate)) return 'That date is not valid.'
+    if (!isoDateInRange(plantedDate, { minDate: plantDateMin, maxDate: plantDateMax })) {
+      return 'Use a date from the last 2 years, not in the future.'
+    }
+    return ''
+  }, [dateTouched, plantedDate, plantDateMin, plantDateMax])
+
+  const canUpdateDates =
+    Boolean(planId) &&
+    Boolean(plantedDate) &&
+    !dateError &&
+    plantedDate !== baselinePlantedDate
 
   const isFinalized = finalized || planStatus === 'finalized'
 
   useEffect(() => {
     if (planId) setActivePlanId(planId)
   }, [planId, setActivePlanId])
+
+  useEffect(() => {
+    // Prefer farmer-set date; otherwise show plan generated date as planted date
+    setPlantedDate(baselinePlantedDate || '')
+    setDateTouched(false)
+  }, [baselinePlantedDate, planId])
 
   useEffect(() => {
     if (loading || !topRecommendation || recommendations.length === 0) return
@@ -161,7 +211,52 @@ export default function Recommendations() {
     )
   }, [selectedCrops, topRecommendation])
 
+  // Prefer live server window (after schedule save) over stale store selection
+  const top = useMemo(() => {
+    const base = activeRec || topRecommendation
+    if (!base) return null
+    const fresh =
+      recommendations.find((r) => r.id === base.id) ||
+      selectedCropsFromServer.find((r) => r.id === base.id) ||
+      (topRecommendation?.id === base.id ? topRecommendation : null)
+    if (!fresh) return base
+    return {
+      ...base,
+      ...fresh,
+      plantingWindow: fresh.plantingWindow || base.plantingWindow,
+      reminders: fresh.reminders || base.reminders,
+    }
+  }, [activeRec, topRecommendation, recommendations, selectedCropsFromServer])
+
+  const reminders = useMemo(() => {
+    const fromServer = remindersFromServer || []
+    if (fromServer.length) return fromServer
+    return top?.reminders || []
+  }, [remindersFromServer, top])
+
   const isSelected = (id) => selectedCrops.some((c) => c.id === id)
+
+  const handleSaveSchedule = async () => {
+    setDateTouched(true)
+    if (!planId) {
+      toast.warning('Open a saved plan first', 'Create or open a plan, then set the plant date.')
+      return
+    }
+    if (!plantedDate || dateError) {
+      toast.warning('Pick a plant date', 'Choose a day in the calendar first.')
+      return
+    }
+    setSavingSchedule(true)
+    try {
+      await recommendationsService.updatePlanSchedule(planId, plantedDate)
+      await retry()
+      toast.success('Dates updated', 'Harvest and sell windows now use your plant date.')
+    } catch (err) {
+      toast.error('Could not save plant date', getErrorMessage(err, 'Please try again.'))
+    } finally {
+      setSavingSchedule(false)
+    }
+  }
 
   const handleConfirm = async () => {
     if (selectedCrops.length === 0) {
@@ -222,7 +317,7 @@ export default function Recommendations() {
     )
   }
 
-  if (!recommendations.length || !topRecommendation) {
+  if (!recommendations.length || !topRecommendation || !top) {
     return (
       <PageWrapper>
         <EmptyState
@@ -236,13 +331,13 @@ export default function Recommendations() {
     )
   }
 
-  const top = activeRec || topRecommendation
   const factors = getDecisionFactors(top)
   const confirmedStamp = finalizedAt || (isFinalized ? cropPlanConfirmedAt : null)
+  const showAside = !simpleMode
 
   return (
-    <div className="flex flex-col lg:flex-row w-full min-h-0 flex-1">
-      <div className="flex-1 min-w-0 flex flex-col min-h-full">
+    <div className="flex w-full min-w-0 flex-col lg:flex-row lg:items-start">
+      <div className="min-w-0 flex-1">
         <RecommendationsHero
           crop={top.crop}
           confidence={top.confidence}
@@ -263,7 +358,7 @@ export default function Recommendations() {
           }
         />
 
-        <PageWrapper className="!pb-48 md:!pb-36 lg:!max-w-none">
+        <PageWrapper className="!pb-36 md:!pb-32 lg:!max-w-none">
           {apiConfig.useMock && (
             <div className="mb-4 flex items-center gap-2">
               <DemoTag />
@@ -285,16 +380,15 @@ export default function Recommendations() {
               type="button"
               variant="ghost"
               size="sm"
-              className="hidden lg:inline-flex shrink-0 text-error hover:bg-error/10"
+              className="inline-flex shrink-0 text-error hover:bg-error/10"
               onClick={() => setShowDeleteModal(true)}
               aria-label="Delete plan permanently"
             >
               <Trash2 className="h-4 w-4" />
-              Delete
+              <span className="hidden sm:inline">Delete</span>
             </Button>
           </div>
 
-          {/* Desktop: crop identity first */}
           <motion.div
             initial={{ opacity: 0, y: 10 }}
             animate={{ opacity: 1, y: 0 }}
@@ -343,7 +437,7 @@ export default function Recommendations() {
               </p>
             </div>
 
-            <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
               {[
                 {
                   key: 'sow',
@@ -372,13 +466,13 @@ export default function Recommendations() {
               ].map(({ key, label, hint, value, Icon, tone }) => (
                 <div
                   key={key}
-                  className={`rounded-xl border px-4 py-4 min-h-[112px] flex flex-col ${tone}`}
+                  className={`rounded-xl border px-4 py-4 min-h-[112px] flex flex-col min-w-0 ${tone}`}
                 >
                   <div className="flex items-center gap-2 mb-2">
                     <Icon className="h-5 w-5 shrink-0" aria-hidden="true" />
                     <p className="text-sm font-semibold">{label}</p>
                   </div>
-                  <p className="font-mono text-xl sm:text-2xl font-medium text-text-primary dark:text-text-dark-primary leading-tight">
+                  <p className="font-mono text-lg sm:text-xl font-medium text-text-primary dark:text-text-dark-primary leading-snug break-words">
                     {value || '—'}
                   </p>
                   <p className="text-xs mt-2 opacity-80" data-detail>
@@ -386,6 +480,96 @@ export default function Recommendations() {
                   </p>
                 </div>
               ))}
+            </div>
+
+            <div className="mt-4 rounded-xl border border-border dark:border-border-dark px-4 py-4">
+              <p className="text-sm font-semibold text-text-primary dark:text-text-dark-primary">
+                I planted on
+              </p>
+              <p className="text-xs text-text-muted dark:text-text-dark-muted mt-0.5 mb-3">
+                {plantedDateSource === 'user'
+                  ? `Using your plant date for ${top.crop}. Change it if the real sow day was different.`
+                  : `No plant date set yet — using the plan date (${formatShortDate(baselinePlantedDate || runDate)}) as sow day for ${top.crop}. Change it if you planted on another day.`}
+              </p>
+              <div className="flex flex-col sm:flex-row gap-3 sm:items-end">
+                <DatePicker
+                  id="planted-date"
+                  value={plantedDate}
+                  placeholder="Pick plant date"
+                  minDate={plantDateMin}
+                  maxDate={plantDateMax}
+                  error={dateError}
+                  onChange={(next) => {
+                    setPlantedDate(next)
+                    setDateTouched(true)
+                  }}
+                  className="sm:max-w-[260px]"
+                />
+                <div className="flex gap-2">
+                  <Button
+                    type="button"
+                    onClick={handleSaveSchedule}
+                    loading={savingSchedule}
+                    disabled={!canUpdateDates}
+                    className="min-h-[48px]"
+                  >
+                    Update dates
+                  </Button>
+                  {plantedDateFromServer && (
+                    <Button
+                      type="button"
+                      variant="secondary"
+                      className="min-h-[48px]"
+                      disabled={savingSchedule || !planId}
+                      onClick={() => {
+                        setDateTouched(false)
+                        recommendationsService
+                          .updatePlanSchedule(planId, null)
+                          .then(() => retry())
+                          .then(() =>
+                            toast.success(
+                              'Back to plan date',
+                              'Sow day uses the plan generated date again.'
+                            )
+                          )
+                          .catch((err) =>
+                            toast.error(
+                              'Could not clear date',
+                              getErrorMessage(err, 'Please try again.')
+                            )
+                          )
+                      }}
+                    >
+                      Use plan date
+                    </Button>
+                  )}
+                </div>
+              </div>
+              {plantedDateSource !== 'user' && plantedDate && !dateError && (
+                <p className="mt-2 text-xs text-text-muted dark:text-text-dark-muted">
+                  Harvest and sell below already use this plan date. Tap Update dates only if you
+                  change the day.
+                </p>
+              )}
+              {notifications.harvestReminders !== false && reminders.length > 0 && (
+                <ul className="mt-4 space-y-2 border-t border-border dark:border-border-dark pt-3">
+                  {reminders.map((rem) => (
+                    <li
+                      key={`${rem.type}-${rem.crop}-${rem.date}`}
+                      className="text-sm text-text-secondary dark:text-text-dark-secondary"
+                    >
+                      <span className="font-medium text-text-primary dark:text-text-dark-primary">
+                        {rem.type === 'sell' ? 'Sell' : 'Harvest'} reminder
+                      </span>
+                      <span className="text-text-muted"> · </span>
+                      {rem.label}
+                      {rem.date ? (
+                        <span className="font-mono text-xs text-text-muted"> · {rem.date}</span>
+                      ) : null}
+                    </li>
+                  ))}
+                </ul>
+              )}
             </div>
 
             <button
@@ -502,13 +686,24 @@ export default function Recommendations() {
             )}
           </section>
 
-          <div className="h-24 md:h-20" aria-hidden />
+          <div className="h-4" aria-hidden />
         </PageWrapper>
 
-        <div className="fixed bottom-16 md:bottom-0 left-0 right-0 z-30 px-5 py-3 pb-[calc(12px+env(safe-area-inset-bottom))] md:pl-72 lg:pr-[min(42%,440px)] bg-surface/95 dark:bg-surface-dark/95 border-t border-border dark:border-border-dark backdrop-blur-md">
-          <div className="max-w-3xl lg:max-w-none mx-auto flex items-center gap-3">
-            <div className="flex-1 min-w-0">
-              <p className="text-sm font-medium text-text-primary dark:text-text-dark-primary truncate">
+        <div
+          className={cn(
+            'fixed z-30 px-5 py-3',
+            'bottom-16 md:bottom-0',
+            'left-0 md:left-[240px]',
+            'right-0',
+            showAside && PLAN_ASIDE_RIGHT_CLASS,
+            'pb-[calc(12px+env(safe-area-inset-bottom))]',
+            'bg-surface/95 dark:bg-surface-dark/95',
+            'border-t border-border dark:border-border-dark backdrop-blur-md'
+          )}
+        >
+          <div className="mx-auto flex max-w-3xl items-center gap-3 lg:max-w-none">
+            <div className="min-w-0 flex-1">
+              <p className="truncate text-sm font-medium text-text-primary dark:text-text-dark-primary">
                 {selectedCrops.length === 0
                   ? 'Pick a crop above'
                   : selectedCrops.map((c) => c.crop).join(', ')}
@@ -540,7 +735,7 @@ export default function Recommendations() {
         </div>
       </div>
 
-      {!simpleMode && (
+      {showAside && (
         <RecommendationsVisualPanel
           crop={top.crop}
           confidence={top.confidence}
@@ -555,7 +750,7 @@ export default function Recommendations() {
         onClose={() => !deleting && setShowDeleteModal(false)}
         title="Delete crop plan?"
       >
-        <p className="text-sm text-text-secondary dark:text-text-dark-secondary mb-5 leading-relaxed">
+        <p className="mb-5 text-sm leading-relaxed text-text-secondary dark:text-text-dark-secondary">
           This permanently deletes your draft or finalized recommendations. Soil readings stay saved
           so you can build a new plan anytime.
         </p>

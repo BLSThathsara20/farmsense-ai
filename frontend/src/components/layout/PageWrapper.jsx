@@ -9,7 +9,7 @@ export function PageWrapper({ children, className, noPadding = false }) {
       animate={{ opacity: 1, y: 0 }}
       transition={spring.gentle}
       className={cn(
-        'flex-1 w-full max-w-3xl mx-auto min-w-0 overflow-x-hidden relative z-[1]',
+        'w-full max-w-3xl mx-auto min-w-0 relative z-[1]',
         !noPadding && 'px-5 py-6 pb-28 md:pb-8',
         'lg:max-w-none lg:px-8',
         className

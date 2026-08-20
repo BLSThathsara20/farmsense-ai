@@ -245,10 +245,18 @@ export default function Landing() {
 					<span className="font-display text-primary font-semibold text-lg">
 						FarmSense
 					</span>
-					<p className="text-sm text-text-muted dark:text-text-dark-muted">
-						Built for farmers who work the land — not analysts who watch
-						dashboards.
-					</p>
+					<div className="flex flex-col sm:items-end gap-1">
+						<p className="text-sm text-text-muted dark:text-text-dark-muted">
+							Built for farmers who work the land — not analysts who watch
+							dashboards.
+						</p>
+						<Link
+							to="/privacy"
+							className="text-sm text-text-secondary dark:text-text-dark-secondary hover:text-primary hover:underline"
+						>
+							Privacy notice (UK)
+						</Link>
+					</div>
 				</div>
 			</footer>
 		</div>

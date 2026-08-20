@@ -207,7 +207,10 @@ export default function Dashboard() {
           { label: 'Top Score', value: `${stats.topCropScore ?? 0}%`, icon: BarChart3 },
           {
             label: 'Price Trend',
-            value: formatPercent(stats.priceTrend ?? 0),
+            value:
+              stats.priceTrendIsPercent === false
+                ? `${Math.round(stats.priceTrend ?? 0)} score`
+                : formatPercent(Number(stats.priceTrend ?? 0)),
             icon: TrendingUp,
           },
           { label: 'Demand', value: stats.demandSignal || '—', icon: Sprout },
@@ -229,16 +232,20 @@ export default function Dashboard() {
         ))}
       </div>
 
-      {stats.sellWindow && (
+      {(stats.sellWindow?.label ||
+        (stats.sellWindow?.start != null && stats.sellWindow?.end != null)) && (
         <Card variant="highlight" className="mb-4 border-l-accent">
           <div className="flex items-center gap-3">
             <Clock className="h-5 w-5 text-accent shrink-0" />
             <div>
               <p className="font-medium text-text-primary dark:text-text-dark-primary">
-                Best sell window: Week {stats.sellWindow.start}–{stats.sellWindow.end}
+                Best sell window:{' '}
+                {stats.sellWindow.label ||
+                  `Week ${stats.sellWindow.start}–${stats.sellWindow.end}`}
               </p>
               <p className="text-sm text-text-secondary dark:text-text-dark-secondary" data-detail>
-                Prices trending up — plan your harvest accordingly
+                {stats.sellHint ||
+                  'Prices trending up — plan your harvest accordingly'}
               </p>
             </div>
           </div>

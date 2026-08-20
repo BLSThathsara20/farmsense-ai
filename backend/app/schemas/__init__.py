@@ -6,6 +6,7 @@ from app.schemas.api import (  # noqa: F401
     ForgotPasswordRequest,
     LoginRequest,
     OversupplyInput,
+    PlanScheduleRequest,
     PreferencesRequest,
     RegisterRequest,
     RenamePlanRequest,

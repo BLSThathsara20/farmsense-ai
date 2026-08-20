@@ -28,6 +28,14 @@ farmsense-ai/
 
 Frontend talks to the backend when `VITE_USE_MOCK_API=false` (default in `.env.example`).
 
+### Viva & development documentation
+
+Open in a browser (double-click or drag into Chrome/Safari):
+
+- **[`docs/viva-reference.html`](docs/viva-reference.html)** — architecture, file structure, DB, ML justifications (Random Forest / LSTM), features, demo steps, and a searchable viva Q&A bank
+- [`database/database-design-plan.html`](database/database-design-plan.html) — database design detail
+- [`ml-models/ml-data-and-training-guide.html`](ml-models/ml-data-and-training-guide.html) — training data guide
+
 ---
 
 ## Prerequisites

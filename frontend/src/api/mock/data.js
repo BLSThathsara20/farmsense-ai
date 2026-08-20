@@ -66,7 +66,7 @@ export const recommendations = [
         detail: 'Local demand and risk that too many farms plant the same crop.',
       },
     ],
-    plantingWindow: { sow: 'Week 3–4', harvest: 'Week 14–16', sell: 'Week 8–10' },
+    plantingWindow: { sow: 'When you plant', harvest: '70–90 days after sow', sell: '75–100 days after sow', mode: 'relative' },
     oversupplyRisk: 0.15,
     reasoning:
       'We ranked Tomato using soil status, weather forecast, future price, and market demand — overall confidence 88%.',
@@ -107,7 +107,7 @@ export const recommendations = [
         detail: 'Local demand and risk that too many farms plant the same crop.',
       },
     ],
-    plantingWindow: { sow: 'Week 2–3', harvest: 'Week 12–14', sell: 'Week 10–12' },
+    plantingWindow: { sow: 'When you plant', harvest: '80–100 days after sow', sell: '85–110 days after sow', mode: 'relative' },
     oversupplyRisk: 0.22,
     reasoning:
       'We ranked Chili using soil status, weather forecast, future price, and market demand — overall confidence 84%.',
@@ -148,7 +148,7 @@ export const recommendations = [
         detail: 'Local demand and risk that too many farms plant the same crop.',
       },
     ],
-    plantingWindow: { sow: 'Week 4–5', harvest: 'Week 16–18', sell: 'Week 14–16' },
+    plantingWindow: { sow: 'When you plant', harvest: '90–120 days after sow', sell: '95–130 days after sow', mode: 'relative' },
     oversupplyRisk: 0.45,
     reasoning:
       'We ranked Onion using soil status, weather forecast, future price, and market demand — overall confidence 78%.',
@@ -189,7 +189,7 @@ export const recommendations = [
         detail: 'Local demand and risk that too many farms plant the same crop.',
       },
     ],
-    plantingWindow: { sow: 'Week 5–6', harvest: 'Week 15–17', sell: 'Week 13–15' },
+    plantingWindow: { sow: 'When you plant', harvest: '80–110 days after sow', sell: '85–120 days after sow', mode: 'relative' },
     oversupplyRisk: 0.35,
     reasoning:
       'We ranked Carrot using soil status, weather forecast, future price, and market demand — overall confidence 71%.',
@@ -230,7 +230,7 @@ export const recommendations = [
         detail: 'Local demand and risk that too many farms plant the same crop.',
       },
     ],
-    plantingWindow: { sow: 'Week 3–4', harvest: 'Week 12–14', sell: 'Week 10–12' },
+    plantingWindow: { sow: 'When you plant', harvest: '70–100 days after sow', sell: '75–110 days after sow', mode: 'relative' },
     oversupplyRisk: 0.72,
     reasoning:
       'We ranked Cabbage using soil status, weather forecast, future price, and market demand — overall confidence 65%.',
@@ -353,8 +353,16 @@ export { regions, textureOptions, cropPreferences }
 export const dashboardStats = {
   topCropScore: 92,
   priceTrend: 7.2,
+  priceTrendIsPercent: true,
+  priceDirection: 'rising',
   demandSignal: 'Rising',
-  sellWindow: { start: 8, end: 10 },
+  sellWindow: {
+    label: '75–100 days after sow',
+    mode: 'relative',
+    start: null,
+    end: null,
+  },
+  sellHint: 'Prices look stronger — plan harvest and sell in this window.',
   oversupplyWarning: {
     crop: 'Cabbage',
     risk: 0.72,

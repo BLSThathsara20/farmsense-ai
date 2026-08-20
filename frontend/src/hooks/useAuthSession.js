@@ -4,7 +4,7 @@ import { useFarmStore } from '../store/farmStore'
 import { authService, apiConfig, ApiError } from '../api'
 import { describeServiceError, isServiceOutageError } from '../lib/serviceError'
 
-const SESSION_CHECK_MS = 6000
+const SESSION_CHECK_MS = 12000
 
 function withTimeout(promise, ms) {
   return new Promise((resolve, reject) => {
@@ -24,9 +24,13 @@ function withTimeout(promise, ms) {
   })
 }
 
+function errorStatus(err) {
+  return err instanceof ApiError ? err.status : err?.status
+}
+
 /**
  * Validates persisted localStorage sessions against the backend.
- * Always resolves within SESSION_CHECK_MS so routes never spin forever.
+ * Only a real 401/403 clears the saved token — timeouts, 429, and outages keep you signed in.
  */
 export function useAuthSession() {
   const hasHydrated = useAuthStore((s) => s.hasHydrated)
@@ -62,7 +66,6 @@ export function useAuthSession() {
         if (!active) return
         setSessionError(null)
         setSessionStatus('unauthenticated')
-        if (token || isAuthenticated) clearSession(null)
         return
       }
 
@@ -73,7 +76,7 @@ export function useAuthSession() {
         return
       }
 
-      // Fresh login/register already proved the token
+      // Fresh login/register already proved the token (same tab, no full reload)
       if (useAuthStore.getState().sessionStatus === 'authenticated') {
         setSessionError(null)
         return
@@ -90,13 +93,30 @@ export function useAuthSession() {
         setSessionError(null)
         setSessionStatus('authenticated')
       } catch (err) {
-        // Clear sticky "checking" for this run even after Strict Mode remount.
         if (useAuthStore.getState()._sessionRunId !== runId) return
+
+        const status = errorStatus(err)
+        // Only invalid/expired credentials should force login again
+        if (status === 401 || status === 403) {
+          if (import.meta.env.DEV) {
+            console.warn('[auth] Session rejected by API — signed out.', status)
+          }
+          clearSession(null)
+          return
+        }
+
+        // 429 / timeout / network / 5xx: keep local session so refresh does not kick you out
         const info = describeServiceError(err, { action: 'verify your session' })
         if (import.meta.env.DEV) {
-          console.warn('[auth] Session invalid — signed out.', info.kind, err)
+          console.warn(
+            '[auth] Session check failed temporarily — staying signed in.',
+            info.kind,
+            status || err?.code,
+            err
+          )
         }
-        clearSession(isServiceOutageError(info) ? info : null)
+        setSessionError(isServiceOutageError(info) ? info : null)
+        setSessionStatus('authenticated')
       }
     })()
 

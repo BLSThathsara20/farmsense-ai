@@ -24,6 +24,16 @@ export function describeServiceError(err, { action = 'complete this request' } =
     }
   }
 
+  // Rate limits are temporary — not an invalid password / expired session
+  if (status === 429) {
+    return {
+      kind: 'connectivity',
+      title: 'Please wait a moment',
+      description: 'Too many requests just now. Your session is still saved — try again shortly.',
+      contactEmail: SUPPORT_CONTACT_EMAIL,
+    }
+  }
+
   if (status === 404 || status === 502 || status === 503 || status === 504 || status >= 500) {
     return {
       kind: 'server',

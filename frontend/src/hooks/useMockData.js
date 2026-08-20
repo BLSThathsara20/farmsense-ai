@@ -85,6 +85,11 @@ export function useRecommendations(planId) {
     finalizedAt: data?.finalizedAt ?? null,
     planId: data?.planId || data?.runId || planId || null,
     title: data?.title || null,
+    plantedDate: data?.plantedDate ?? null,
+    effectivePlantedDate: data?.effectivePlantedDate ?? null,
+    generatedPlantedDate: data?.generatedPlantedDate ?? null,
+    plantedDateSource: data?.plantedDateSource ?? null,
+    reminders: data?.reminders ?? [],
   }
 }
 

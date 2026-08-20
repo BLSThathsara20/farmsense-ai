@@ -32,6 +32,7 @@ from app.schemas import (
     ForgotPasswordRequest,
     LoginRequest,
     OversupplyInput,
+    PlanScheduleRequest,
     PreferencesRequest,
     RegisterRequest,
     RenamePlanRequest,
@@ -65,6 +66,7 @@ from app.services.recommendation_service import (
     list_plans,
     plans_overview,
     rename_plan,
+    update_plan_schedule,
 )
 from app.services.seed_service import seed_reference_data
 from app.services.soil_service import create_soil_reading, get_primary_farm
@@ -213,7 +215,7 @@ def build_router() -> APIRouter:
         return reset_password(db, payload.token, payload.password)
 
     @router.get("/auth/me")
-    @limiter.limit(settings.rate_limit_default)
+    @limiter.limit("300/minute")
     def auth_me(
         request: Request,
         db: Annotated[Session, Depends(get_db)],
@@ -294,13 +296,18 @@ def build_router() -> APIRouter:
         db: Annotated[Session, Depends(get_db)],
         user: Annotated[UserAccount, Depends(get_current_user)],
     ):
+        from app.core.middleware import response_cache
+
         farm = get_primary_farm(db, user)
         try:
-            return finalize_recommendation_run(
+            result = finalize_recommendation_run(
                 db, farm, payload.cropIds, run_id=payload.planId
             )
         except ValueError as exc:
             raise HTTPException(status_code=400, detail=str(exc)) from exc
+        key = cache_key("GET", "/dashboard", "", str(user.id))
+        response_cache.pop(key, None)
+        return result
 
     @router.delete("/recommendations/plan")
     @limiter.limit("20/minute")
@@ -362,11 +369,16 @@ def build_router() -> APIRouter:
         db: Annotated[Session, Depends(get_db)],
         user: Annotated[UserAccount, Depends(get_current_user)],
     ):
+        from app.core.middleware import response_cache
+
         farm = get_primary_farm(db, user)
         try:
-            return finalize_recommendation_run(db, farm, payload.cropIds, run_id=plan_id)
+            result = finalize_recommendation_run(db, farm, payload.cropIds, run_id=plan_id)
         except ValueError as exc:
             raise HTTPException(status_code=400, detail=str(exc)) from exc
+        key = cache_key("GET", "/dashboard", "", str(user.id))
+        response_cache.pop(key, None)
+        return result
 
     @router.patch("/plans/{plan_id}")
     @limiter.limit("30/minute")
@@ -382,6 +394,27 @@ def build_router() -> APIRouter:
             return rename_plan(db, farm, plan_id, payload.title)
         except ValueError as exc:
             raise HTTPException(status_code=400, detail=str(exc)) from exc
+
+    @router.patch("/plans/{plan_id}/schedule")
+    @limiter.limit("30/minute")
+    def patch_plan_schedule(
+        request: Request,
+        plan_id: str,
+        payload: PlanScheduleRequest,
+        db: Annotated[Session, Depends(get_db)],
+        user: Annotated[UserAccount, Depends(get_current_user)],
+    ):
+        """Save planted date → exact harvest/sell ranges + reminders for each crop."""
+        from app.core.middleware import response_cache
+
+        farm = get_primary_farm(db, user)
+        try:
+            result = update_plan_schedule(db, farm, plan_id, payload.plantedDate)
+        except ValueError as exc:
+            raise HTTPException(status_code=400, detail=str(exc)) from exc
+        key = cache_key("GET", "/dashboard", "", str(user.id))
+        response_cache.pop(key, None)
+        return result
 
     @router.delete("/plans/{plan_id}")
     @limiter.limit("20/minute")

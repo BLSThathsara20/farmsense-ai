@@ -13,6 +13,7 @@ import { useTheme } from '../hooks/useTheme'
 import { useToast } from '../hooks/useToast'
 import { authService, apiConfig } from '../api'
 import { cn, formatShortDate } from '../lib/utils'
+import { openConsentPreferences } from '../lib/consent'
 
 export default function Settings() {
   const navigate = useNavigate()
@@ -168,14 +169,19 @@ export default function Settings() {
       <Card variant="bordered" className="mb-4">
         <h2 className="ek-label mb-4">Notifications</h2>
         <p className="text-sm text-text-secondary dark:text-text-dark-secondary mb-3">
-          Saved prototype preferences for future alert delivery. They do not send live notifications
-          yet.
+          Preferences for harvest/sell reminders on your plans. Live push/email delivery is not wired
+          yet — reminder dates still show on each crop plan when you set a plant date.
         </p>
         <div className="space-y-1">
           <Toggle
             label="Sell window alerts"
             checked={notifications.sellAlerts}
             onChange={(v) => setNotifications({ sellAlerts: v })}
+          />
+          <Toggle
+            label="Harvest reminders"
+            checked={notifications.harvestReminders !== false}
+            onChange={(v) => setNotifications({ harvestReminders: v })}
           />
           <Toggle
             label="Weather alerts"
@@ -276,10 +282,24 @@ export default function Settings() {
 
       <Card variant="bordered" className="mb-8 bg-primary/5" data-detail>
         <h2 className="text-sm font-medium mb-2">Data &amp; privacy</h2>
-        <p className="text-sm text-text-secondary leading-relaxed">
+        <p className="text-sm text-text-secondary leading-relaxed mb-3">
           Farm data is stored securely per account. District community stats use anonymised counts
-          only — never your name or email.
+          only — never your name or email. This app follows UK GDPR / PECR rules for a student
+          prototype: essential storage to run your account, optional storage for display settings,
+          and no advertising cookies.
         </p>
+        <div className="flex flex-wrap gap-x-4 gap-y-2">
+          <Link to="/privacy" className="text-sm text-primary font-medium hover:underline">
+            Privacy notice
+          </Link>
+          <button
+            type="button"
+            onClick={openConsentPreferences}
+            className="text-sm text-primary font-medium hover:underline"
+          >
+            Cookie choices
+          </button>
+        </div>
       </Card>
 
       <button

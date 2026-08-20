@@ -105,6 +105,47 @@ export const recommendationsService = {
     return backendClient.patch(backendEndpoints.plan(planId), { title })
   },
 
+  async updatePlanSchedule(planId, plantedDate) {
+    if (apiConfig.useMock) {
+      const planted = plantedDate || null
+      const harvest = planted
+        ? 'About 70–90 days after plant date'
+        : '70–90 days after sow'
+      const sell = planted
+        ? 'About 75–100 days after plant date'
+        : '75–100 days after sow'
+      return withMockDelay({
+        recommendations,
+        topRecommendation: {
+          ...recommendations[0],
+          plantingWindow: {
+            sow: planted || 'When you plant',
+            harvest,
+            sell,
+            mode: planted ? 'calendar' : 'relative',
+            plantedDate: planted,
+          },
+        },
+        plantedDate: planted,
+        reminders: planted
+          ? [
+              {
+                type: 'harvest',
+                crop: recommendations[0].crop,
+                date: planted,
+                label: `Harvest window opens for ${recommendations[0].crop}`,
+              },
+            ]
+          : [],
+        planId,
+        runId: planId,
+      })
+    }
+    return backendClient.patch(backendEndpoints.planSchedule(planId), {
+      plantedDate: plantedDate || null,
+    })
+  },
+
   async deletePlan(planId) {
     if (apiConfig.useMock) {
       return withMockDelay({ deleted: true, runsDeleted: 1, planId })

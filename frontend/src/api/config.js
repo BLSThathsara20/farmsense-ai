@@ -66,6 +66,7 @@ export const backendEndpoints = {
   plansOverview: '/plans/overview',
   plan: (id) => `/plans/${id}`,
   confirmPlanById: (id) => `/plans/${id}/confirm`,
+  planSchedule: (id) => `/plans/${id}/schedule`,
   market: '/market',
   community: '/community',
   soil: '/soil',

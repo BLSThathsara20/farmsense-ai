@@ -81,6 +81,7 @@ export function useSyncProfile() {
       } catch (err) {
         if (cancelled) return
         const status = err instanceof ApiError ? err.status : err?.status
+        // Only hard auth failures sign out — 429/timeouts must not wipe the session
         if (status === 401 || status === 403) {
           useFarmStore.getState().resetFarmData()
           logout()

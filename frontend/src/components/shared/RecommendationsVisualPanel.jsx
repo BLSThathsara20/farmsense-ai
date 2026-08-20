@@ -8,9 +8,14 @@ import { spring } from '../../lib/motion'
 
 const loadRecsAsideBg = () => import('../../assets/backgrounds/recommendations-aside.webp')
 
+/** Desktop plan aside width — keep in sync with Recommendations layout / footer inset. */
+export const PLAN_ASIDE_WIDTH_CLASS = 'w-[400px]'
+export const PLAN_ASIDE_RIGHT_CLASS = 'lg:right-[400px]'
+
 /**
- * Full-height visual plane for Recommendations (desktop).
- * The succulent photo is the dominant edge-to-edge surface — not a card.
+ * Desktop visual summary for a crop plan.
+ * Rendered in normal flow with sticky positioning (not fixed) so the page
+ * has a single scrollbar and the panel stays on screen while content scrolls.
  */
 export function RecommendationsVisualPanel({
   crop,
@@ -18,83 +23,93 @@ export function RecommendationsVisualPanel({
   profitEstimate,
   isFinalized,
   plantingWindow,
+  className,
 }) {
   const loader = useCallback(() => loadRecsAsideBg(), [])
 
   return (
-    <LazyBackground
-      loader={loader}
-      alt=""
+    <aside
       className={cn(
-        'hidden lg:block w-[min(42%,440px)] shrink-0',
+        'hidden lg:block shrink-0',
+        PLAN_ASIDE_WIDTH_CLASS,
+        'sticky top-0 h-dvh self-start',
         'border-l border-border dark:border-border-dark',
         'bg-[#052e16]',
-        'sticky top-0 h-dvh'
+        className
       )}
-      contentClassName="h-full"
-      imageClassName="object-cover object-[center_35%] scale-[1.02]"
-      overlayClassName="bg-gradient-to-t from-black/85 via-black/35 to-black/20"
+      aria-label="Plan summary"
     >
-      <div className="relative z-10 flex flex-col justify-between h-full px-8 xl:px-10 py-10">
-        <div className="inline-flex items-center gap-2 self-start rounded-md border border-white/15 bg-black/30 px-2.5 py-1.5 backdrop-blur-sm">
-          <Sparkles className="h-3.5 w-3.5 text-emerald-200" />
-          <span className="ek-label !normal-case tracking-ek !text-white/75">
-            {isFinalized ? 'Finalized plan' : 'Recommended'}
-          </span>
-        </div>
-
-        <div>
-          <AnimatePresence mode="wait">
-            <motion.div
-              key={crop || 'crop'}
-              initial={{ opacity: 0, y: 14 }}
-              animate={{ opacity: 1, y: 0 }}
-              exit={{ opacity: 0, y: -8 }}
-              transition={spring.gentle}
-            >
-              <p className="ek-label !text-white/55 mb-2">Plant this</p>
-              <h2 className="font-display text-4xl xl:text-5xl font-semibold text-white tracking-tight leading-[1.05] drop-shadow-sm">
-                {crop || 'Your plan'}
-              </h2>
-              {confidence != null && (
-                <p className="mt-4 text-sm text-white/80">
-                  <span className="font-mono text-lg text-white">{confidence}%</span>
-                  <span className="text-white/55"> match</span>
-                </p>
-              )}
-              {profitEstimate != null && (
-                <p className="mt-1 text-sm text-emerald-100/90">
-                  {formatCurrency(profitEstimate)}
-                  <span className="text-white/50"> est. profit</span>
-                </p>
-              )}
-            </motion.div>
-          </AnimatePresence>
-
-          <div className="mt-8 space-y-3 border-t border-white/15 pt-6">
-            <p className="ek-label !text-white/50 mb-1">Next steps</p>
-            {[
-              { label: 'Sow', value: plantingWindow?.sow },
-              { label: 'Harvest', value: plantingWindow?.harvest },
-              { label: 'Sell', value: plantingWindow?.sell },
-            ].map(({ label, value }) => (
-              <div key={label} className="flex items-baseline justify-between gap-3">
-                <span className="text-sm text-white/65">{label}</span>
-                <span className="font-mono text-sm text-white">{value || '—'}</span>
-              </div>
-            ))}
+      <LazyBackground
+        loader={loader}
+        alt=""
+        className="h-full w-full"
+        contentClassName="h-full"
+        imageClassName="object-cover object-[center_35%] scale-[1.02]"
+        overlayClassName="bg-gradient-to-t from-black/85 via-black/35 to-black/20"
+      >
+        <div className="relative z-10 flex h-full flex-col justify-between overflow-y-auto overscroll-contain px-8 xl:px-10 py-10">
+          <div className="inline-flex items-center gap-2 self-start rounded-md border border-white/15 bg-black/30 px-2.5 py-1.5 backdrop-blur-sm">
+            <Sparkles className="h-3.5 w-3.5 text-emerald-200" />
+            <span className="ek-label !normal-case tracking-ek !text-white/75">
+              {isFinalized ? 'Finalized plan' : 'Recommended'}
+            </span>
           </div>
 
-          <p className="mt-8 text-sm text-white/60 leading-relaxed max-w-[22rem]">
-            First decide what and when. The “why” details can wait.
-          </p>
+          <div>
+            <AnimatePresence mode="wait">
+              <motion.div
+                key={crop || 'crop'}
+                initial={{ opacity: 0, y: 14 }}
+                animate={{ opacity: 1, y: 0 }}
+                exit={{ opacity: 0, y: -8 }}
+                transition={spring.gentle}
+              >
+                <p className="ek-label !text-white/55 mb-2">Plant this</p>
+                <h2 className="font-display text-4xl xl:text-5xl font-semibold text-white tracking-tight leading-[1.05] drop-shadow-sm">
+                  {crop || 'Your plan'}
+                </h2>
+                {confidence != null && (
+                  <p className="mt-4 text-sm text-white/80">
+                    <span className="font-mono text-lg text-white">{confidence}%</span>
+                    <span className="text-white/55"> match</span>
+                  </p>
+                )}
+                {profitEstimate != null && (
+                  <p className="mt-1 text-sm text-emerald-100/90">
+                    {formatCurrency(profitEstimate)}
+                    <span className="text-white/50"> est. profit</span>
+                  </p>
+                )}
+              </motion.div>
+            </AnimatePresence>
+
+            <div className="mt-8 space-y-3 border-t border-white/15 pt-6">
+              <p className="ek-label !text-white/50 mb-1">Next steps</p>
+              {[
+                { label: 'Sow', value: plantingWindow?.sow },
+                { label: 'Harvest', value: plantingWindow?.harvest },
+                { label: 'Sell', value: plantingWindow?.sell },
+              ].map(({ label, value }) => (
+                <div key={label} className="flex items-baseline justify-between gap-3">
+                  <span className="text-sm text-white/65">{label}</span>
+                  <span className="font-mono text-sm text-white break-words text-right max-w-[70%]">
+                    {value || '—'}
+                  </span>
+                </div>
+              ))}
+            </div>
+
+            <p className="mt-8 text-sm text-white/60 leading-relaxed max-w-[22rem]">
+              First decide what and when. The “why” details can wait.
+            </p>
+          </div>
         </div>
-      </div>
-    </LazyBackground>
+      </LazyBackground>
+    </aside>
   )
 }
 
-/** Compact full-bleed hero for mobile / tablet. */
+/** Compact full-bleed hero for mobile / tablet only. */
 export function RecommendationsHero({
   crop,
   confidence,
@@ -109,10 +124,10 @@ export function RecommendationsHero({
     <LazyBackground
       loader={loader}
       alt=""
-      className="w-full min-h-[220px] sm:min-h-[260px] rounded-none lg:hidden"
+      className="w-full min-h-[200px] sm:min-h-[240px] rounded-none lg:hidden"
       imageClassName="object-cover object-[center_30%]"
       overlayClassName="bg-gradient-to-t from-black/80 via-black/45 to-black/25"
-      contentClassName="min-h-[220px] sm:min-h-[260px] flex flex-col justify-between px-5 py-5"
+      contentClassName="min-h-[200px] sm:min-h-[240px] flex flex-col justify-between px-5 py-5"
     >
       <div className="flex items-start justify-between gap-3">
         <div className="inline-flex items-center gap-2 rounded-md border border-white/15 bg-black/30 px-2.5 py-1 backdrop-blur-sm">

@@ -43,7 +43,14 @@ CREATE TABLE crop_reference (
     l1_label        VARCHAR(64),
     is_active       BOOLEAN NOT NULL DEFAULT TRUE,
     min_ph          NUMERIC(4, 2),
-    max_ph          NUMERIC(4, 2)
+    max_ph          NUMERIC(4, 2),
+    -- Lifecycle: set days (or category) when adding crops so timelines auto-apply
+    category        VARCHAR(40) NOT NULL DEFAULT 'default',
+    days_to_harvest_min SMALLINT,
+    days_to_harvest_max SMALLINT,
+    days_to_sell_min    SMALLINT,
+    days_to_sell_max    SMALLINT,
+    lifecycle_note  VARCHAR(160)
 );
 
 CREATE TABLE soil_reading (

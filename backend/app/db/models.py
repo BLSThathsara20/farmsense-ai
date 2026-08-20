@@ -95,6 +95,13 @@ class CropReference(Base):
     display_name: Mapped[str] = mapped_column(String(80), nullable=False)
     l1_label: Mapped[str | None] = mapped_column(String(64))
     is_active: Mapped[bool] = mapped_column(Boolean, default=True)
+    # Lifecycle drives sow/harvest/sell calendars. New crops should set days or category.
+    category: Mapped[str] = mapped_column(String(40), default="default", nullable=False)
+    days_to_harvest_min: Mapped[int | None] = mapped_column(SmallInteger)
+    days_to_harvest_max: Mapped[int | None] = mapped_column(SmallInteger)
+    days_to_sell_min: Mapped[int | None] = mapped_column(SmallInteger)
+    days_to_sell_max: Mapped[int | None] = mapped_column(SmallInteger)
+    lifecycle_note: Mapped[str | None] = mapped_column(String(160))
 
 
 class SoilReading(Base):

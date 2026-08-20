@@ -76,6 +76,19 @@ class RenamePlanRequest(BaseModel):
     title: str = Field(min_length=1, max_length=160)
 
 
+class PlanScheduleRequest(BaseModel):
+    """Optional planted date → exact harvest/sell calendars + reminders.
+
+    Pass null / omit plantedDate to clear and return relative day windows again.
+    """
+
+    plantedDate: str | None = Field(
+        default=None,
+        description="ISO date YYYY-MM-DD when seed went in the ground",
+        max_length=10,
+    )
+
+
 class PreferencesRequest(BaseModel):
     """Partial preference update — omit fields you do not want to change."""
 

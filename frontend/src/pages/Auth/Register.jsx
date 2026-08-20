@@ -46,6 +46,7 @@ export default function Register() {
   const [locationError, setLocationError] = useState('')
   const [serviceError, setServiceError] = useState(null)
   const [retryAction, setRetryAction] = useState(null)
+  const [privacyAgreed, setPrivacyAgreed] = useState(false)
 
   const step1Form = useForm({
     resolver: zodResolver(step1Schema),
@@ -258,11 +259,33 @@ export default function Register() {
                           success={confirmMatch ? 'Passwords match' : undefined}
                           {...step1Form.register('confirmPassword')}
                         />
+                        {!isAdminSetup && (
+                          <label className="flex items-start gap-2.5 cursor-pointer">
+                            <input
+                              type="checkbox"
+                              checked={privacyAgreed}
+                              onChange={(e) => setPrivacyAgreed(e.target.checked)}
+                              className="mt-1 h-4 w-4 rounded border-border text-primary focus:ring-primary"
+                            />
+                            <span className="text-sm text-text-secondary dark:text-text-dark-secondary leading-relaxed">
+                              I agree to the{' '}
+                              <Link to="/privacy" className="text-primary font-medium hover:underline">
+                                Privacy notice
+                              </Link>{' '}
+                              (UK GDPR). FarmSense stores my account and farm plans to provide the
+                              service.
+                            </span>
+                          </label>
+                        )}
                         <Button
                           type="submit"
                           className="w-full"
                           loading={loading}
-                          disabled={confirmMismatch || !step1Form.formState.isValid}
+                          disabled={
+                            confirmMismatch ||
+                            !step1Form.formState.isValid ||
+                            (!isAdminSetup && !privacyAgreed)
+                          }
                         >
                           {isAdminSetup ? 'Create admin account' : 'Continue'}
                         </Button>

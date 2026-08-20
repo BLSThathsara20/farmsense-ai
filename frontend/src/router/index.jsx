@@ -10,7 +10,7 @@ import { homePathForUser, isAdminUser } from '../lib/roles'
 
 function AuthBootLoader() {
   return (
-    <div className="flex items-center justify-center min-h-[50vh]">
+    <div className="w-full flex-1 flex items-center justify-center min-h-[50vh] self-stretch">
       <Spinner size="lg" />
     </div>
   )
@@ -78,6 +78,7 @@ const Market = lazy(() => import('../pages/Market'))
 const Community = lazy(() => import('../pages/Community'))
 const Settings = lazy(() => import('../pages/Settings'))
 const Help = lazy(() => import('../pages/Help'))
+const Privacy = lazy(() => import('../pages/Privacy'))
 const AdminOverview = lazy(() => import('../pages/Admin/AdminOverview'))
 const AdminAnalysis = lazy(() => import('../pages/Admin/AdminAnalysis'))
 const AdminFarmers = lazy(() => import('../pages/Admin/AdminFarmers'))
@@ -86,7 +87,7 @@ const AdminModels = lazy(() => import('../pages/Admin/AdminModels'))
 
 function PageLoader() {
   return (
-    <div className="flex items-center justify-center min-h-[50vh]">
+    <div className="w-full flex-1 flex items-center justify-center min-h-[50vh] self-stretch">
       <Spinner size="lg" />
     </div>
   )
@@ -180,6 +181,14 @@ export const router = createBrowserRouter([
         element: (
           <LazyPage>
             <ResetPassword />
+          </LazyPage>
+        ),
+      },
+      {
+        path: '/privacy',
+        element: (
+          <LazyPage>
+            <Privacy />
           </LazyPage>
         ),
       },

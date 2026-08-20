@@ -17,6 +17,7 @@ from app.db.models import (
     SoilReading,
 )
 from app.ml.loader import district_oversupply_warning, predict_suitability, rank_by_profit
+from app.services.crop_lifecycle_service import attach_crop_schedule, enrich_plan_schedules
 from app.services.soil_service import soil_to_ml_vector
 
 # Crops FarmSense markets as UK-relevant (aligns with GOV.UK / Plan UI)
@@ -305,31 +306,29 @@ def build_recommendations_from_rf(
             },
         ]
 
-        recommendations.append(
-            {
-                "id": idx,
-                "crop": display,
-                "confidence": confidence,
-                "profitEstimate": profit,
-                "soilMatch": soil_match,
-                "weatherFit": weather_fit,
-                "priceTrend": price_trend,
-                "demandSignal": demand_signal,
-                "factors": factors,
-                "plantingWindow": {
-                    "sow": "Week 3–4",
-                    "harvest": "Week 14–16",
-                    "sell": "Week 8–10",
-                },
-                "oversupplyRisk": round(oversupply, 2),
-                "reasoning": (
-                    f"{display} scored {confidence}% overall from UK-biased soil (L1), "
-                    f"hybrid weather ({weather['method']}), dampened GOV.UK price, "
-                    f"and public demand plus district planting signals."
-                ),
-                "rank": idx,
-            }
-        )
+        rec = {
+            "id": idx,
+            "crop": display,
+            "confidence": confidence,
+            "profitEstimate": profit,
+            "soilMatch": soil_match,
+            "weatherFit": weather_fit,
+            "priceTrend": price_trend,
+            "priceChangePct": crop_price.get("change_pct"),
+            "priceDirection": crop_price.get("direction"),
+            "demandSignal": demand_signal,
+            "factors": factors,
+            "oversupplyRisk": round(oversupply, 2),
+            "reasoning": (
+                f"{display} scored {confidence}% overall from UK-biased soil (L1), "
+                f"hybrid weather ({weather['method']}), dampened GOV.UK price, "
+                f"and public demand plus district planting signals."
+            ),
+            "rank": idx,
+        }
+        # Crop-specific sow/harvest/sell from crop_reference (auto for new plants)
+        attach_crop_schedule(rec, db, planted_date=None)
+        recommendations.append(rec)
     return rank_by_profit(recommendations)
 
 
@@ -485,7 +484,7 @@ def _decrement_district_for_run(db: Session, farm: FarmProfile, run: Recommendat
         db.delete(row)
 
 
-def _plan_payload_from_run(run: RecommendationRun) -> dict:
+def _plan_payload_from_run(run: RecommendationRun, db: Session | None = None) -> dict:
     payload = dict(run.ranked_output or {})
     payload["runId"] = str(run.id)
     payload["planId"] = str(run.id)
@@ -498,7 +497,8 @@ def _plan_payload_from_run(run: RecommendationRun) -> dict:
     else:
         payload.setdefault("planStatus", "draft")
         payload.setdefault("finalized", False)
-    return payload
+    # Refresh windows from current crop_reference so new lifecycle data applies automatically
+    return enrich_plan_schedules(db, payload)
 
 
 def _get_farm_run(db: Session, farm: FarmProfile, run_id) -> RecommendationRun | None:
@@ -524,7 +524,7 @@ def list_plans(db: Session, farm: FarmProfile) -> list[dict]:
     ).all()
     items = []
     for run in runs:
-        payload = _plan_payload_from_run(run)
+        payload = _plan_payload_from_run(run, db)
         selected = payload.get("selectedCrops") or []
         items.append(
             {
@@ -534,14 +534,21 @@ def list_plans(db: Session, farm: FarmProfile) -> list[dict]:
                 "planStatus": payload.get("planStatus"),
                 "finalized": bool(payload.get("finalized")),
                 "finalizedAt": payload.get("finalizedAt"),
+                "plantedDate": payload.get("plantedDate"),
                 "topCrop": run.top_crop or (selected[0].get("crop") if selected else None),
                 "topProfitEstimate": float(run.top_profit_estimate)
                 if run.top_profit_estimate is not None
                 else None,
                 "selectedCrops": [
-                    {"id": c.get("id"), "crop": c.get("crop"), "confidence": c.get("confidence")}
+                    {
+                        "id": c.get("id"),
+                        "crop": c.get("crop"),
+                        "confidence": c.get("confidence"),
+                        "plantingWindow": c.get("plantingWindow"),
+                    }
                     for c in selected
                 ],
+                "reminders": payload.get("reminders") or [],
                 "createdAt": run.created_at.isoformat() if run.created_at else None,
                 "runDate": payload.get("runDate"),
             }
@@ -553,7 +560,7 @@ def get_plan(db: Session, farm: FarmProfile, run_id) -> dict | None:
     run = _get_farm_run(db, farm, run_id)
     if not run:
         return None
-    payload = _plan_payload_from_run(run)
+    payload = _plan_payload_from_run(run, db)
     if run.soil_reading_id:
         reading = db.get(SoilReading, run.soil_reading_id)
         if reading:
@@ -613,7 +620,37 @@ def rename_plan(db: Session, farm: FarmProfile, run_id, title: str) -> dict:
     flag_modified(run, "ranked_output")
     db.commit()
     db.refresh(run)
-    return _plan_payload_from_run(run)
+    return _plan_payload_from_run(run, db)
+
+
+def update_plan_schedule(
+    db: Session,
+    farm: FarmProfile,
+    run_id,
+    planted_date: str | None,
+) -> dict:
+    """Set or clear planted date; recalculate crop-specific calendars + reminders."""
+    from app.services.crop_lifecycle_service import _parse_date
+
+    run = _get_farm_run(db, farm, run_id)
+    if not run:
+        raise ValueError("Plan not found.")
+
+    # Validate (None / empty clears)
+    if planted_date is not None and str(planted_date).strip() != "":
+        parsed = _parse_date(planted_date)
+        planted_iso = parsed.isoformat()
+    else:
+        planted_iso = None
+
+    payload = dict(run.ranked_output or {})
+    payload["plantedDate"] = planted_iso
+    payload = enrich_plan_schedules(db, payload)
+    run.ranked_output = payload
+    flag_modified(run, "ranked_output")
+    db.commit()
+    db.refresh(run)
+    return _plan_payload_from_run(run, db)
 
 
 def finalize_recommendation_run(
@@ -685,7 +722,7 @@ def finalize_recommendation_run(
     )
     db.commit()
     db.refresh(run)
-    return _plan_payload_from_run(run)
+    return _plan_payload_from_run(run, db)
 
 
 def delete_plan(db: Session, farm: FarmProfile, run_id) -> dict:
@@ -721,7 +758,7 @@ def latest_recommendations(db: Session, farm: FarmProfile) -> dict | None:
     )
     if not run:
         return None
-    return _plan_payload_from_run(run)
+    return _plan_payload_from_run(run, db)
 
 
 def get_market_payload(db: Session, crop_name: str, *, demo_data_mode: bool = False) -> dict:
@@ -879,11 +916,60 @@ def dashboard_payload(db: Session, user, farm: FarmProfile, recs: dict | None, r
     if overall_crops and not top:
         top = {"crop": overall_crops[0]["crop"], "confidence": overall_crops[0].get("confidence") or 0}
 
+    # Prefer a finalized plan's top crop when latest run is only a draft
+    if overall_crops and recs and not recs.get("finalized"):
+        fin_name = overall_crops[0].get("crop")
+        match = next(
+            (c for c in (recs.get("recommendations") or []) if c.get("crop") == fin_name),
+            None,
+        )
+        if match:
+            top = match
+
+    pw = (top or {}).get("plantingWindow") or {}
+    sell_label = pw.get("sell")
+    demand_score = (top or {}).get("demandSignal")
+    if isinstance(demand_score, (int, float)):
+        demand_label = (
+            "Rising" if demand_score >= 70 else "Steady" if demand_score >= 50 else "Soft"
+        )
+    elif isinstance(demand_score, str) and demand_score:
+        demand_label = demand_score
+    else:
+        demand_label = "—"
+
+    price_change = (top or {}).get("priceChangePct")
+    if price_change is None and top:
+        # Older saved plans may only have the 0–100 score
+        price_change = None
+    direction = (top or {}).get("priceDirection")
+    if not direction and isinstance(price_change, (int, float)):
+        direction = (
+            "rising" if price_change >= 1 else "softening" if price_change <= -1 else "steady"
+        )
+
+    sell_hint = "Plan harvest and sales using this crop’s grow window."
+    if direction == "rising":
+        sell_hint = "Prices look stronger — plan harvest and sell in this window."
+    elif direction == "softening":
+        sell_hint = "Prices look softer — use this window carefully."
+
     stats = {
         "topCropScore": top["confidence"] if top else 0,
-        "priceTrend": top.get("priceTrend", 0) if top else 0,
-        "demandSignal": "Rising",
-        "sellWindow": {"start": 8, "end": 10},
+        # Real % change when available; UI falls back to score label if null
+        "priceTrend": price_change if price_change is not None else (top.get("priceTrend") if top else 0),
+        "priceTrendIsPercent": price_change is not None,
+        "priceDirection": direction,
+        "demandSignal": demand_label,
+        "sellWindow": {
+            "label": sell_label,
+            "mode": pw.get("mode"),
+            "plantedDate": pw.get("plantedDate") or (recs or {}).get("effectivePlantedDate"),
+            # Legacy week fields kept for older mock clients
+            "start": None,
+            "end": None,
+        },
+        "sellHint": sell_hint,
         "oversupplyWarning": None,
         "recentActivity": [],
         "draftCount": overview.get("draftCount", 0),
@@ -927,4 +1013,6 @@ def dashboard_payload(db: Session, user, farm: FarmProfile, recs: dict | None, r
         "plansOverview": overview,
         "allSelectedCrops": overall_crops,
         "latestPlanId": overview.get("latestPlanId"),
+        "effectivePlantedDate": (recs or {}).get("effectivePlantedDate"),
+        "plantedDateSource": (recs or {}).get("plantedDateSource"),
     }
